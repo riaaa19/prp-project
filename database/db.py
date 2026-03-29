@@ -78,10 +78,10 @@ def initialize_db():
         cur.executemany(
             "INSERT INTO clubs (name, description, created_at) VALUES (?,?,?)",
             [
-                ("Tech Club", "Focuses on technology and coding events", "2025-01-01T00:00:00"),
-                ("Sports Club", "Organizes sports and fitness activities", "2025-01-01T00:00:00"),
-                ("Cultural Club", "Promotes cultural events and traditions", "2025-01-01T00:00:00"),
-                ("Arts Club", "Supports artistic and creative activities", "2025-01-01T00:00:00"),
+                ("Tech Club", "Focuses on technology and coding events", "2026-01-01T00:00:00"),
+                ("Sports Club", "Organizes sports and fitness activities", "2026-01-01T00:00:00"),
+                ("Cultural Club", "Promotes cultural events and traditions", "2026-01-01T00:00:00"),
+                ("Arts Club", "Supports artistic and creative activities", "2026-01-01T00:00:00"),
             ],
         )
 
@@ -104,13 +104,29 @@ def initialize_db():
         cur.executemany(
             "INSERT INTO events (name, date, club_id, club) VALUES (?,?,?,?)",
             [
-                ("Tech Fest 2025",        "2025-09-15", club_map["Tech Club"], "Tech Club"),
-                ("Annual Sports Day",     "2025-10-02", club_map["Sports Club"], "Sports Club"),
-                ("Cultural Night",        "2025-11-20", club_map["Cultural Club"], "Cultural Club"),
-                ("Coding Hackathon",      "2025-08-28", club_map["Tech Club"], "Tech Club"),
-                ("Photography Workshop",  "2025-09-05", club_map["Arts Club"], "Arts Club"),
+                ("Tech Fest 2026",        "2026-09-15", club_map["Tech Club"], "Tech Club"),
+                ("Annual Sports Day",     "2026-10-02", club_map["Sports Club"], "Sports Club"),
+                ("Cultural Night",        "2026-11-20", club_map["Cultural Club"], "Cultural Club"),
+                ("Coding Hackathon",      "2026-08-28", club_map["Tech Club"], "Tech Club"),
+                ("Photography Workshop",  "2026-09-05", club_map["Arts Club"], "Arts Club"),
             ],
         )
+
+    # Keep legacy demo records aligned to year 2026.
+    cur.execute(
+        """
+        UPDATE clubs
+        SET created_at = '2026' || substr(created_at, 5)
+        WHERE substr(created_at, 1, 4) <> '2026'
+        """
+    )
+    cur.execute(
+        """
+        UPDATE events
+        SET date = '2026' || substr(date, 5)
+        WHERE substr(date, 1, 4) <> '2026'
+        """
+    )
 
     conn.commit()
     conn.close()

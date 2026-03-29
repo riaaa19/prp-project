@@ -160,7 +160,7 @@ class AdminDashboard(tk.Frame):
         tv_frame, tv = make_treeview(left, cols)
         tv_frame.pack(fill="both", expand=True)
         for ev in event_svc.get_all_events()[:5]:
-            status = "upcoming" if ev.date >= "2025-01-01" else "completed"
+            status = "upcoming" if ev.date >= "2026-01-01" else "completed"
             tv.insert("", "end", values=(ev.name, ev.date, ev.club, status))
 
         make_button(left, "+ Add Event", lambda: self._show_section("manage_events"), color=ACCENT, width=12).pack(anchor="e", pady=(8, 0))
@@ -215,7 +215,7 @@ class AdminDashboard(tk.Frame):
         card.pack(fill="x", ipadx=10, ipady=10)
 
         fields = [
-            ("Event Name",  "e.g. Tech Fest 2025"),
+            ("Event Name",  "e.g. Tech Fest 2026"),
             ("Date",        "YYYY-MM-DD"),
             ("Club Name",   "e.g. Tech Club"),
         ]
@@ -255,7 +255,7 @@ class AdminDashboard(tk.Frame):
         return "" if val == placeholder else val
 
     def _submit_add_event(self):
-        name = self._get_entry_val(self._ae_name, "e.g. Tech Fest 2025")
+        name = self._get_entry_val(self._ae_name, "e.g. Tech Fest 2026")
         date = self._get_entry_val(self._ae_date, "YYYY-MM-DD")
         club = self._get_entry_val(self._ae_club, "e.g. Tech Club")
         try:
@@ -720,49 +720,82 @@ class AdminDashboard(tk.Frame):
     # Section: Event Calendar
     # ══════════════════════════════════════════════════════════════════════
     def _build_event_calendar(self):
-        self._active_calendar_date = date.today()
+        self._active_calendar_date = date.today().replace(day=1)
+        self._selected_calendar_day = date.today()
+        self._event_dates_in_month = set()
+        self._calendar_events_by_date = {}
 
         wrap = tk.Frame(self._content, bg=BG, padx=40, pady=30)
         wrap.pack(fill="both", expand=True)
 
-        make_label(wrap, "Event Calendar", font=FONT_TITLE).pack(anchor="w")
-        make_label(wrap, "Overview of events and day-by-day schedule", fg=MUTED).pack(anchor="w", pady=(4, 16))
+        make_label(wrap, "Event Calendar", font=FONT_TITLE).pack(anchor="center")
+        make_label(wrap, "Overview of events and day-by-day schedule", fg=MUTED).pack(anchor="center", pady=(4, 16))
 
         controls = tk.Frame(wrap, bg=BG)
-        controls.pack(fill="x", pady=(0, 12))
+        controls.pack(pady=(0, 12))
 
         make_button(controls, "◀", lambda: self._change_month(-1), width=4).pack(side="left")
-        make_button(controls, "▶", lambda: self._change_month(1), width=4).pack(side="left", padx=(4, 0))
-        make_label(controls, " ", font=FONT_SMALL, fg=TEXT).pack(side="left", padx=(16, 0))
-
         self._calendar_label = tk.Label(controls, text="", bg=BG, fg=ACCENT, font=FONT_BODY)
-        self._calendar_label.pack(side="left")
+        self._calendar_label.pack(side="left", padx=16)
+        make_button(controls, "▶", lambda: self._change_month(1), width=4).pack(side="left", padx=(0, 12))
 
-        make_button(controls, "🔄 Refresh", self._refresh_event_calendar, color=SURFACE2, width=10).pack(side="right")
+        make_button(controls, "🔄 Refresh", self._refresh_event_calendar, color=SURFACE2, width=10).pack(side="left")
 
-        cal_frame = tk.Frame(wrap, bg=BG)
-        cal_frame.pack(fill="both", expand=True)
+        cal_frame = tk.Frame(wrap, bg=SURFACE, padx=14, pady=14, highlightthickness=1, highlightbackground=BORDER)
+        cal_frame.pack(anchor="center", pady=(0, 18))
 
-        # left: month calendar
-        cal_left = tk.Frame(cal_frame, bg=BG)
-        cal_left.pack(side="left", fill="y", padx=(0, 20))
+        self._day_buttons = []
+        headers = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        for idx, day_name in enumerate(headers):
+            tk.Label(
+                cal_frame,
+                text=day_name,
+                bg=SURFACE,
+                fg=MUTED,
+                font=FONT_SMALL,
+                width=5,
+            ).grid(row=0, column=idx, padx=3, pady=(0, 6))
 
-        self._month_text = tk.Text(cal_left, width=26, height=10, bg=SURFACE, fg=TEXT, font=("Courier", 10), bd=0)
-        self._month_text.pack()
-        self._month_text.configure(state="disabled")
+        for week_idx in range(6):
+            row_buttons = []
+            for day_idx in range(7):
+                btn = tk.Button(
+                    cal_frame,
+                    text="",
+                    width=5,
+                    height=2,
+                    bg=SURFACE2,
+                    fg=TEXT,
+                    relief="flat",
+                    bd=0,
+                    cursor="hand2",
+                    font=("Helvetica", 11, "bold"),
+                )
+                btn.grid(row=week_idx + 1, column=day_idx, padx=3, pady=3)
+                row_buttons.append(btn)
+            self._day_buttons.append(row_buttons)
 
-        # right: events for selected date
-        right = tk.Frame(cal_frame, bg=BG)
-        right.pack(side="left", fill="both", expand=True)
+        details = tk.Frame(wrap, bg=BG)
+        details.pack(fill="both", expand=True)
 
-        make_label(right, "Selected Day Events", font=FONT_HEAD).pack(anchor="w")
-        cols = ("Event", "Date", "Club", "Present", "Absent", "Total")
-        tv_frame, self._cal_tree = make_treeview(right, cols)
+        self._selected_date_title = make_label(details, "", font=FONT_HEAD)
+        self._selected_date_title.pack(anchor="w")
+        self._selected_date_meta = make_label(details, "", fg=MUTED)
+        self._selected_date_meta.pack(anchor="w", pady=(0, 8))
+
+        selected_cols = ("Event", "Club", "Present", "Absent", "Total")
+        tv_frame, self._cal_tree = make_treeview(details, selected_cols)
         tv_frame.pack(fill="both", expand=True)
         for c in ("Present", "Absent", "Total"):
             self._cal_tree.column(c, width=80, anchor="center")
 
-        self._load_event_calendar()
+        make_label(details, "All Events In This Month", font=FONT_HEAD).pack(anchor="w", pady=(14, 0))
+        month_cols = ("Date", "Event", "Club", "Present", "Absent", "Total")
+        month_frame, self._month_events_tree = make_treeview(details, month_cols)
+        month_frame.pack(fill="both", expand=True, pady=(8, 0))
+        for c in ("Present", "Absent", "Total"):
+            self._month_events_tree.column(c, width=80, anchor="center")
+
         self._render_month_calendar()
 
     def _render_month_calendar(self):
@@ -770,17 +803,69 @@ class AdminDashboard(tk.Frame):
         year = self._active_calendar_date.year
         self._calendar_label.config(text=f"{calendar.month_name[month]} {year}")
 
-        m = calendar.monthcalendar(year, month)
-        lines = ["Mo Tu We Th Fr Sa Su"]
-        for week in m:
-            lines.append(" ".join(f"{d:2}" if d else "  " for d in week))
-
-        self._month_text.configure(state="normal")
-        self._month_text.delete("1.0", "end")
-        self._month_text.insert("end", "\n".join(lines))
-        self._month_text.configure(state="disabled")
+        if self._selected_calendar_day.month != month or self._selected_calendar_day.year != year:
+            self._selected_calendar_day = date(year, month, 1)
 
         self._load_event_calendar()
+
+        weeks = calendar.monthcalendar(year, month)
+        while len(weeks) < 6:
+            weeks.append([0, 0, 0, 0, 0, 0, 0])
+
+        today = date.today()
+        default_bg = SURFACE2
+        event_bg = "#3B7FD9"
+        event_fg = TEXT
+        today_bg = "#D97706"
+        selected_bg = ACCENT
+
+        for week_idx, week in enumerate(weeks):
+            for day_idx, day in enumerate(week):
+                btn = self._day_buttons[week_idx][day_idx]
+                if day == 0:
+                    btn.config(text="", state="disabled", bg=BG, fg=MUTED, command=lambda: None)
+                    continue
+
+                cell_date = date(year, month, day)
+                has_event = cell_date.isoformat() in self._event_dates_in_month
+
+                bg_color = default_bg
+                fg_color = TEXT
+                relief_style = "flat"
+                border_width = 0
+                if has_event:
+                    bg_color = event_bg
+                    fg_color = event_fg
+                    relief_style = "raised"
+                    border_width = 1
+                if cell_date == today:
+                    bg_color = today_bg
+                    fg_color = "white"
+                    relief_style = "raised"
+                    border_width = 1
+                if cell_date == self._selected_calendar_day:
+                    bg_color = selected_bg
+                    fg_color = "white"
+                    relief_style = "solid"
+                    border_width = 1
+
+                btn.config(
+                    text=str(day),
+                    state="normal",
+                    bg=bg_color,
+                    fg=fg_color,
+                    relief=relief_style,
+                    bd=border_width,
+                    activebackground=selected_bg,
+                    activeforeground="white",
+                    command=lambda d=day: self._select_calendar_day(d),
+                )
+
+    def _select_calendar_day(self, day):
+        month = self._active_calendar_date.month
+        year = self._active_calendar_date.year
+        self._selected_calendar_day = date(year, month, day)
+        self._render_month_calendar()
 
     def _change_month(self, delta):
         month = self._active_calendar_date.month + delta
@@ -792,23 +877,68 @@ class AdminDashboard(tk.Frame):
             month = 1
             year += 1
         self._active_calendar_date = self._active_calendar_date.replace(year=year, month=month, day=1)
+        self._selected_calendar_day = self._active_calendar_date
         self._render_month_calendar()
 
     def _load_event_calendar(self):
         self._cal_tree.delete(*self._cal_tree.get_children())
-        selected_date = self._active_calendar_date.isoformat()
+        self._month_events_tree.delete(*self._month_events_tree.get_children())
+
+        month = self._active_calendar_date.month
+        year = self._active_calendar_date.year
+        selected_date = self._selected_calendar_day.isoformat()
+
+        self._selected_date_title.config(text=f"Details for {self._selected_calendar_day.strftime('%A, %d %B %Y')}")
 
         summary = att_svc.get_attendance_summary()
-        for row in summary:
-            self._cal_tree.insert("", "end", values=(row["event_name"], row["date"], row["club"], row["present"], row["absent"], row["total"]))
+        self._calendar_events_by_date = {}
+        month_events = []
 
-        # show day-specific events (if any), highlight selected date
-        date_key = selected_date
-        events_by_day = [r for r in summary if r.get("date") == date_key]
-        if events_by_day:
-            self._cal_tree.delete(*self._cal_tree.get_children())
-            for row in events_by_day:
-                self._cal_tree.insert("", "end", values=(row["event_name"], row["date"], row["club"], row["present"], row["absent"], row["total"]))
+        for row in summary:
+            row_date = row.get("date")
+            if not row_date:
+                continue
+            self._calendar_events_by_date.setdefault(row_date, []).append(row)
+            try:
+                row_dt = datetime.strptime(row_date, "%Y-%m-%d").date()
+            except ValueError:
+                continue
+            if row_dt.year == year and row_dt.month == month:
+                month_events.append(row)
+
+        self._event_dates_in_month = set()
+        for row in month_events:
+            row_date = row.get("date")
+            if not row_date:
+                continue
+            try:
+                row_dt = datetime.strptime(row_date, "%Y-%m-%d").date()
+            except ValueError:
+                continue
+            self._event_dates_in_month.add(row_dt.isoformat())
+
+        selected_events = self._calendar_events_by_date.get(selected_date, [])
+        self._selected_date_meta.config(text=f"Events on selected date: {len(selected_events)}")
+        if selected_events:
+            for row in selected_events:
+                self._cal_tree.insert(
+                    "",
+                    "end",
+                    values=(row["event_name"], row["club"], row["present"], row["absent"], row["total"]),
+                )
+        else:
+            self._cal_tree.insert("", "end", values=("No events", "-", "-", "-", "-"))
+
+        month_events.sort(key=lambda r: (r.get("date", ""), r.get("event_name", "")))
+        for row in month_events:
+            self._month_events_tree.insert(
+                "",
+                "end",
+                values=(row["date"], row["event_name"], row["club"], row["present"], row["absent"], row["total"]),
+            )
+
+        if not month_events:
+            self._month_events_tree.insert("", "end", values=("-", "No events this month", "-", "-", "-", "-"))
 
     def _refresh_event_calendar(self):
         self._render_month_calendar()

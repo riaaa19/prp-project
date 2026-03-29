@@ -62,3 +62,23 @@ def get_all_registrations():
         return [dict(row) for row in cur.fetchall()]
     finally:
         conn.close()
+
+
+def get_event_registrations(event_id: int):
+    """Return list of registrations for a specific event."""
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT u.id, u.username, u.email
+            FROM   registrations r
+            JOIN   users u ON u.id = r.user_id
+            WHERE  r.event_id = ?
+            ORDER BY u.username
+            """,
+            (event_id,),
+        )
+        return [dict(row) for row in cur.fetchall()]
+    finally:
+        conn.close()
