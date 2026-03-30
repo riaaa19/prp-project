@@ -9,11 +9,12 @@ Three sections reachable via the sidebar:
 Everything is wired up — no dead buttons.
 """
 import tkinter as tk
-from tkinter import filedialog, messagebox, simpledialog
+from tkinter import filedialog, messagebox, simpledialog, ttk
 import csv
 import calendar
 from datetime import date, datetime
 import services.event_service as event_svc
+import services.club_service as club_svc
 import services.registration_service as reg_svc
 import services.attendance_service as att_svc
 import services.user_service as user_svc
@@ -106,6 +107,7 @@ class AdminDashboard(tk.Frame):
         builders = {
             "dashboard":          self._build_dashboard,
             "manage_events":      self._build_manage_events,
+            "add_event":          self._build_add_event,
             "members":            self._build_members,
             "clubs":              self._build_clubs,
             "attendance":         self._build_attendance,
@@ -163,7 +165,7 @@ class AdminDashboard(tk.Frame):
             status = "upcoming" if ev.date >= "2026-01-01" else "completed"
             tv.insert("", "end", values=(ev.name, ev.date, ev.club, status))
 
-        make_button(left, "+ Add Event", lambda: self._show_section("manage_events"), color=ACCENT, width=12).pack(anchor="e", pady=(8, 0))
+        make_button(left, "+ Add Event", lambda: self._show_section("add_event"), color=ACCENT, width=12).pack(anchor="e", pady=(8, 0))
 
         # mini calendar placeholder
         make_label(right, "Quick Calendar", font=FONT_HEAD).pack(anchor="w")
@@ -192,12 +194,58 @@ class AdminDashboard(tk.Frame):
         wrap = tk.Frame(self._content, bg=BG, padx=40, pady=30)
         wrap.pack(fill="both", expand=True)
         make_label(wrap, "Clubs", font=FONT_TITLE).pack(anchor="w")
-        make_label(wrap, "Overview of clubs in events", fg=MUTED).pack(anchor="w", pady=(4, 16))
-        cols = ("Club", "Events")
-        tv_frame, clubs_tree = make_treeview(wrap, cols)
+        make_label(wrap, "Create and manage clubs", fg=MUTED).pack(anchor="w", pady=(4, 16))
+
+        form = tk.Frame(wrap, bg=SURFACE, padx=16, pady=16,
+                        highlightthickness=1, highlightbackground=BORDER)
+        form.pack(fill="x", pady=(0, 12))
+
+        tk.Label(form, text="Club Name", bg=SURFACE, fg=MUTED,
+                 font=("Helvetica", 9, "bold")).grid(row=0, column=0, sticky="w")
+        tk.Label(form, text="Description", bg=SURFACE, fg=MUTED,
+                 font=("Helvetica", 9, "bold")).grid(row=0, column=1, sticky="w", padx=(10, 0))
+
+        self._club_name_entry = make_entry(form, width=26)
+        self._club_name_entry.grid(row=1, column=0, sticky="we", pady=(4, 0))
+        self._club_desc_entry = make_entry(form, width=44)
+        self._club_desc_entry.grid(row=1, column=1, sticky="we", padx=(10, 0), pady=(4, 0))
+
+        btn_row = tk.Frame(form, bg=SURFACE)
+        btn_row.grid(row=1, column=2, padx=(12, 0), sticky="e")
+        make_button(btn_row, "➕ Add Club", self._submit_add_club, width=12).pack(side="left")
+        make_button(btn_row, "🔄 Refresh", self._load_clubs, color=SURFACE2, width=10).pack(side="left", padx=(8, 0))
+
+        form.columnconfigure(0, weight=1)
+        form.columnconfigure(1, weight=1)
+
+        cols = ("Name", "Description", "Created")
+        tv_frame, self._clubs_tree = make_treeview(wrap, cols)
         tv_frame.pack(fill="both", expand=True)
-        for c in event_svc.get_club_summary():
-            clubs_tree.insert("", "end", values=(c["club"], c["event_count"]))
+        self._clubs_tree.column("Description", width=360, anchor="w")
+        self._clubs_tree.column("Name", width=180, anchor="w")
+
+        self._load_clubs()
+
+    def _load_clubs(self):
+        self._clubs_tree.delete(*self._clubs_tree.get_children())
+        for club in club_svc.get_all_clubs():
+            self._clubs_tree.insert(
+                "",
+                "end",
+                values=(club["name"], club.get("description", ""), club["created_at"]),
+            )
+
+    def _submit_add_club(self):
+        name = self._club_name_entry.get().strip()
+        description = self._club_desc_entry.get().strip()
+        try:
+            club_svc.add_club(name, description)
+            self._club_name_entry.delete(0, "end")
+            self._club_desc_entry.delete(0, "end")
+            self._load_clubs()
+            show_toast(self, "Club added successfully!", success=True)
+        except ValueError as exc:
+            messagebox.showwarning("Add Club", str(exc))
 
     # ══════════════════════════════════════════════════════════════════════
     # Section: Add Event
@@ -217,7 +265,6 @@ class AdminDashboard(tk.Frame):
         fields = [
             ("Event Name",  "e.g. Tech Fest 2026"),
             ("Date",        "YYYY-MM-DD"),
-            ("Club Name",   "e.g. Tech Club"),
         ]
         entries = []
         for label, placeholder in fields:
@@ -232,11 +279,28 @@ class AdminDashboard(tk.Frame):
             entry.bind("<FocusOut>", lambda e, en=entry, ph=placeholder: self._restore_ph(en, ph))
             entries.append(entry)
 
-        self._ae_name, self._ae_date, self._ae_club = entries
+        self._ae_name, self._ae_date = entries
+
+        tk.Label(card, text="Club", bg=SURFACE, fg=MUTED,
+                 font=("Helvetica", 9, "bold"), anchor="w").pack(fill="x", pady=(8, 2))
+        clubs = [club["name"] for club in club_svc.get_all_clubs()]
+        self._ae_clubs = clubs
+        self._ae_club_var = tk.StringVar(value=(clubs[0] if clubs else ""))
+        self._ae_club = ttk.Combobox(
+            card,
+            textvariable=self._ae_club_var,
+            values=clubs,
+            state="readonly" if clubs else "disabled",
+            font=FONT_BODY,
+        )
+        self._ae_club.pack(fill="x", pady=(0, 4))
 
         self._ae_err = tk.StringVar()
         tk.Label(card, textvariable=self._ae_err, bg=SURFACE, fg=ACCENT2,
                  font=FONT_SMALL).pack(anchor="w", pady=(6, 0))
+
+        if not clubs:
+            self._ae_err.set("No clubs available. Add a club first in the Clubs section.")
 
         make_button(card, "➕  Add Event", self._submit_add_event, width=20).pack(anchor="w", pady=(10, 0))
 
@@ -257,7 +321,10 @@ class AdminDashboard(tk.Frame):
     def _submit_add_event(self):
         name = self._get_entry_val(self._ae_name, "e.g. Tech Fest 2026")
         date = self._get_entry_val(self._ae_date, "YYYY-MM-DD")
-        club = self._get_entry_val(self._ae_club, "e.g. Tech Club")
+        club = self._ae_club_var.get().strip()
+        if club and club not in self._ae_clubs:
+            self._ae_err.set("Please select a valid club from the list.")
+            return
         try:
             event_svc.add_event(name, date, club)
             show_toast(self, "✅  Event added successfully!", success=True)
@@ -276,9 +343,12 @@ class AdminDashboard(tk.Frame):
         make_label(wrap, "Select a row to edit or delete an event.",
                    fg=MUTED).pack(anchor="w", pady=(4, 16))
 
-        # refresh button
-        make_button(wrap, "🔄  Refresh", self._refresh_events,
-                    color=SURFACE2, width=12).pack(anchor="e", pady=(0, 8))
+        action_row = tk.Frame(wrap, bg=BG)
+        action_row.pack(fill="x", pady=(0, 8))
+        make_button(action_row, "➕  Add Event", lambda: self._show_section("add_event"),
+                    color=ACCENT, width=12).pack(side="left")
+        make_button(action_row, "🔄  Refresh", self._refresh_events,
+                    color=SURFACE2, width=12).pack(side="right")
 
         # Treeview
         cols = ("ID", "Name", "Date", "Club")
