@@ -8,9 +8,11 @@ Three sections reachable via sidebar:
 
 All buttons fully wired.
 """
+import csv
 import tkinter as tk
 from datetime import date, datetime
-from tkinter import messagebox, ttk
+from tkinter import filedialog, messagebox, ttk
+import services.attendance_service as att_svc
 import services.event_service as event_svc
 import services.registration_service as reg_svc
 import services.notification_service as notif_svc
@@ -28,7 +30,7 @@ class StudentDashboard(tk.Frame):
         self._on_logout = on_logout
         self._active_section = None
         self._build()
-        self._show_section("view_events")
+        self._show_section("overview")
 
     # ══════════════════════════════════════════════════════════════════════
     # Layout skeleton
@@ -54,6 +56,7 @@ class StudentDashboard(tk.Frame):
 
         self._nav_btns = {}
         nav_items = [
+            ("🏠  Overview",      "overview"),
             ("📅  View Events",   "view_events"),
             ("✏️   Register",      "register"),
             ("🎟  My Events",     "my_events"),
@@ -91,6 +94,7 @@ class StudentDashboard(tk.Frame):
             w.destroy()
 
         {
+            "overview":    self._build_overview,
             "view_events": self._build_view_events,
             "register":    self._build_register,
             "my_events":   self._build_my_events,
@@ -121,6 +125,136 @@ class StudentDashboard(tk.Frame):
         combo["values"] = clubs
         if variable.get() not in clubs:
             variable.set("All Clubs")
+
+    def _get_registered_events(self):
+        return reg_svc.get_events_for_student(self._user.id)
+
+    def _get_registered_event_ids(self):
+        return {event["id"] for event in self._get_registered_events()}
+
+    def _format_event_status(self, event_date: str):
+        event_day = self._safe_parse_date(event_date)
+        if event_day is None:
+            return "Date not available"
+        days_left = (event_day - date.today()).days
+        if days_left < 0:
+            return f"Completed {abs(days_left)} day(s) ago"
+        if days_left == 0:
+            return "Happening today"
+        if days_left == 1:
+            return "Happening tomorrow"
+        return f"Starts in {days_left} day(s)"
+
+    def _build_overview(self):
+        wrap = tk.Frame(self._content, bg=BG, padx=30, pady=24)
+        wrap.pack(fill="both", expand=True)
+
+        make_label(wrap, "Student Overview", font=FONT_TITLE).pack(anchor="w")
+        make_label(wrap, "Your events, notifications, and next steps in one place.",
+                   fg=MUTED).pack(anchor="w", pady=(4, 12))
+
+        registered_events = self._get_registered_events()
+        registered_ids = {event["id"] for event in registered_events}
+        unread_count = notif_svc.get_unread_count(self._user.id)
+        attendance_rows = [
+            row for row in att_svc.get_all_attendance()
+            if row["user_id"] == self._user.id and row["status"] == "present"
+        ]
+
+        upcoming_registered = []
+        open_events = []
+        today = date.today()
+        for ev in event_svc.get_all_events():
+            event_day = self._safe_parse_date(ev.date)
+            if ev.id not in registered_ids:
+                open_events.append(ev)
+            if event_day and event_day >= today and ev.id in registered_ids:
+                upcoming_registered.append((event_day, ev))
+
+        upcoming_registered.sort(key=lambda item: item[0])
+        next_event_text = "No upcoming registered events"
+        if upcoming_registered:
+            next_event = upcoming_registered[0][1]
+            next_event_text = f"{next_event.name} • {next_event.date}"
+
+        card_row = tk.Frame(wrap, bg=BG)
+        card_row.pack(fill="x", pady=(6, 16))
+
+        def summary_card(parent, title, value, note, accent):
+            card = tk.Frame(parent, bg=SURFACE, padx=14, pady=12)
+            card.pack(side="left", expand=True, fill="x", padx=6)
+            tk.Label(card, text=title, bg=SURFACE, fg=MUTED, font=("Helvetica", 9)).pack(anchor="w")
+            tk.Label(card, text=str(value), bg=SURFACE, fg=accent, font=("Helvetica", 24, "bold")).pack(anchor="w", pady=(2, 0))
+            tk.Label(card, text=note, bg=SURFACE, fg=MUTED, font=("Helvetica", 8)).pack(anchor="w", pady=(2, 0))
+            return card
+
+        summary_card(card_row, "My Events", len(registered_events), "Registered activities", ACCENT)
+        summary_card(card_row, "Upcoming", len(upcoming_registered), "Still ahead on your schedule", ACCENT3)
+        summary_card(card_row, "Unread", unread_count, "Notification(s) waiting", ACCENT2)
+        summary_card(card_row, "Present", len(attendance_rows), "Attendance marked present", ACCENT3)
+
+        lower = tk.Frame(wrap, bg=BG)
+        lower.pack(fill="both", expand=True)
+
+        left = tk.Frame(lower, bg=BG)
+        left.pack(side="left", fill="both", expand=True, padx=(0, 8))
+        right = tk.Frame(lower, bg=BG, width=280)
+        right.pack(side="left", fill="y")
+        right.pack_propagate(False)
+
+        quick = tk.Frame(left, bg=SURFACE, padx=16, pady=16,
+                         highlightthickness=1, highlightbackground=BORDER)
+        quick.pack(fill="x", pady=(0, 12))
+        make_label(quick, "Quick Actions", font=FONT_HEAD, bg=SURFACE).pack(anchor="w")
+        make_label(quick, f"Next event: {next_event_text}", fg=MUTED, bg=SURFACE).pack(anchor="w", pady=(2, 10))
+        actions = tk.Frame(quick, bg=SURFACE)
+        actions.pack(fill="x")
+        make_button(actions, "Browse Events", lambda: self._show_section("view_events"), width=14).pack(side="left")
+        make_button(actions, "My Schedule", lambda: self._show_section("my_events"), color=ACCENT3, width=14).pack(side="left", padx=(8, 0))
+        make_button(actions, "Notifications", lambda: self._show_section("notifications"), color=SURFACE2, width=14).pack(side="left", padx=(8, 0))
+
+        make_label(left, "Suggested Events", font=FONT_HEAD).pack(anchor="w")
+        make_label(left, "Events you have not registered for yet.", fg=MUTED).pack(anchor="w", pady=(0, 8))
+        suggestion_box = tk.Frame(left, bg=SURFACE, padx=16, pady=12,
+                                  highlightthickness=1, highlightbackground=BORDER)
+        suggestion_box.pack(fill="both", expand=True)
+
+        if open_events:
+            for ev in open_events[:4]:
+                tk.Label(
+                    suggestion_box,
+                    text=f"• {ev.name}\n  {ev.date} • {ev.club}\n  {self._format_event_status(ev.date)}",
+                    bg=SURFACE,
+                    fg=TEXT,
+                    justify="left",
+                    anchor="w",
+                    wraplength=500,
+                    font=FONT_SMALL,
+                ).pack(anchor="w", fill="x", pady=(0, 8))
+        else:
+            make_label(suggestion_box, "You are already registered for all available events.",
+                       fg=MUTED, bg=SURFACE).pack(anchor="w")
+
+        side_card = tk.Frame(right, bg=SURFACE, padx=14, pady=14,
+                             highlightthickness=1, highlightbackground=BORDER)
+        side_card.pack(fill="both", expand=True)
+        make_label(side_card, "Latest Updates", font=FONT_HEAD, bg=SURFACE).pack(anchor="w")
+        notes = notif_svc.get_notifications(self._user.id)[:4]
+        if notes:
+            for note in notes:
+                tag = "Unread" if note["read_flag"] == 0 else "Read"
+                tk.Label(
+                    side_card,
+                    text=f"• {tag}: {note['message']}",
+                    bg=SURFACE,
+                    fg=TEXT,
+                    justify="left",
+                    anchor="w",
+                    wraplength=240,
+                    font=FONT_SMALL,
+                ).pack(anchor="w", fill="x", pady=(0, 8))
+        else:
+            make_label(side_card, "No notifications yet.", fg=MUTED, bg=SURFACE).pack(anchor="w")
 
     # ══════════════════════════════════════════════════════════════════════
     # Section: View Events
@@ -165,6 +299,16 @@ class StudentDashboard(tk.Frame):
         tv_frame, self._ve_tree = make_treeview(wrap, cols)
         tv_frame.pack(fill="both", expand=True)
         self._ve_tree.column("ID", width=50)
+        self._ve_tree.bind("<<TreeviewSelect>>", lambda _e: self._update_view_event_preview())
+
+        preview_card = tk.Frame(wrap, bg=SURFACE, padx=14, pady=12,
+                                highlightthickness=1, highlightbackground=BORDER)
+        preview_card.pack(fill="x", pady=(10, 0))
+        make_label(preview_card, "Selected Event Details", font=FONT_HEAD, bg=SURFACE).pack(anchor="w")
+        self._ve_preview_var = tk.StringVar(value="Select an event to view its details and registration status.")
+        tk.Label(preview_card, textvariable=self._ve_preview_var,
+                 bg=SURFACE, fg=TEXT, justify="left", anchor="w", wraplength=760,
+                 font=FONT_SMALL).pack(fill="x", pady=(6, 0))
 
         self._load_all_events_view()
 
@@ -189,6 +333,30 @@ class StudentDashboard(tk.Frame):
 
         self._ve_summary_var.set(
             f"Showing {len(events)} event(s) • {upcoming_count} upcoming"
+        )
+
+        children = self._ve_tree.get_children()
+        if children:
+            self._ve_tree.selection_set(children[0])
+            self._update_view_event_preview()
+        elif hasattr(self, "_ve_preview_var"):
+            self._ve_preview_var.set("No events match the current filters.")
+
+    def _update_view_event_preview(self):
+        if not hasattr(self, "_ve_preview_var"):
+            return
+
+        sel = self._ve_tree.selection()
+        if not sel:
+            self._ve_preview_var.set("Select an event to view its details and registration status.")
+            return
+
+        values = self._ve_tree.item(sel[0])["values"]
+        event_id, event_name, event_date, club = values
+        is_registered = int(event_id) in self._get_registered_event_ids()
+        registration_text = "Already in your schedule" if is_registered else "Open for registration"
+        self._ve_preview_var.set(
+            f"{event_name}\nClub: {club}\nDate: {event_date} • {self._format_event_status(event_date)}\nStatus: {registration_text}"
         )
 
     def _refresh_events_view(self):
@@ -261,12 +429,19 @@ class StudentDashboard(tk.Frame):
 
     def _load_register_events(self):
         self._set_event_filter_values(self._reg_club, self._reg_club_var)
-        events = self._get_filtered_events(self._reg_search.get(), self._reg_club_var.get())
+        registered_ids = self._get_registered_event_ids()
+        events = [
+            ev for ev in self._get_filtered_events(self._reg_search.get(), self._reg_club_var.get())
+            if ev.id not in registered_ids
+        ]
         self._reg_ev_tree.delete(*self._reg_ev_tree.get_children())
         for ev in events:
             self._reg_ev_tree.insert("", "end", iid=ev.id,
                                      values=(ev.id, ev.name, ev.date, ev.club))
-        self._reg_summary_var.set(f"{len(events)} event(s) ready for registration")
+        if events:
+            self._reg_summary_var.set(f"{len(events)} new event(s) ready for registration")
+        else:
+            self._reg_summary_var.set("No new events available right now.")
 
     def _refresh_register_list(self):
         self._load_register_events()
@@ -294,6 +469,10 @@ class StudentDashboard(tk.Frame):
         try:
             reg_svc.register_student(self._user.id, event_id)
             notif_svc.create_notification(self._user.id, f"You registered for '{event_name}'.")
+            if hasattr(self, "_reg_ev_tree"):
+                self._load_register_events()
+            if hasattr(self, "_ve_tree"):
+                self._update_view_event_preview()
             show_toast(self, f"Registered for '{event_name}'! 🎉", success=True)
         except ValueError as exc:
             show_toast(self, str(exc), success=False)
@@ -311,12 +490,14 @@ class StudentDashboard(tk.Frame):
 
         action_row = tk.Frame(wrap, bg=BG)
         action_row.pack(fill="x", pady=(0, 8))
-        make_button(action_row, "🔄  Refresh", self._refresh_my_events,
-                    color=SURFACE2, width=12).pack(side="right")
         make_button(action_row, "❌ Cancel Selected", self._cancel_selected_registration,
                     color=ACCENT2, width=16).pack(side="left")
+        make_button(action_row, "⬇ Export Schedule", self._export_my_events,
+                    color=ACCENT3, width=16).pack(side="left", padx=(8, 0))
+        make_button(action_row, "🔄  Refresh", self._refresh_my_events,
+                    color=SURFACE2, width=12).pack(side="right")
 
-        cols = ("Event Name", "Date", "Club")
+        cols = ("Event Name", "Date", "Club", "Attendance")
         tv_frame, self._my_tree = make_treeview(wrap, cols)
         tv_frame.pack(fill="both", expand=True)
 
@@ -332,16 +513,41 @@ class StudentDashboard(tk.Frame):
         today = date.today()
         next_event_text = " No upcoming events yet."
         next_event_date = None
+        attendance_map = {
+            row["event_id"]: row["status"].title()
+            for row in att_svc.get_all_attendance()
+            if row["user_id"] == self._user.id
+        }
 
         for ev in reg_svc.get_events_for_student(self._user.id):
+            attendance_status = attendance_map.get(ev["id"], "Pending")
             self._my_tree.insert("", "end", iid=str(ev["id"]),
-                                 values=(ev["name"], ev["date"], ev["club"]))
+                                 values=(ev["name"], ev["date"], ev["club"], attendance_status))
             event_day = self._safe_parse_date(ev["date"])
             if event_day and event_day >= today and (next_event_date is None or event_day < next_event_date):
                 next_event_date = event_day
                 next_event_text = f" Next up: {ev['name']} on {ev['date']}."
 
         self._next_registered_event_text = next_event_text
+
+    def _export_my_events(self):
+        path = filedialog.asksaveasfilename(
+            title="Export My Schedule",
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*")],
+        )
+        if not path:
+            return
+
+        try:
+            rows = [self._my_tree.item(item_id)["values"] for item_id in self._my_tree.get_children()]
+            with open(path, "w", newline="", encoding="utf-8") as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow(["event_name", "date", "club", "attendance"])
+                writer.writerows(rows)
+            show_toast(self, "My event schedule exported.", success=True)
+        except Exception as exc:
+            messagebox.showerror("Export Schedule", str(exc))
 
     def _refresh_my_events(self):
         self._load_my_events()
