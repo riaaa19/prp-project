@@ -64,7 +64,10 @@ class AdminDashboard(tk.Frame):
         nav_items = [
             ("📊  Dashboard",        "dashboard"),
             ("📅  Events",           "manage_events"),
-            ("👥  Members",          "members"),
+            ("📣  Announcements",    "announcements"),
+            ("📈  Reports",          "reports"),
+            ("�  Registrations",    "registrations"),
+            ("�👥  Members",          "members"),
             ("🏛  Clubs",            "clubs"),
             ("📝  Attendance",      "attendance"),
             ("📆  Calendar",        "event_calendar"),
@@ -108,6 +111,9 @@ class AdminDashboard(tk.Frame):
             "dashboard":          self._build_dashboard,
             "manage_events":      self._build_manage_events,
             "add_event":          self._build_add_event,
+            "registrations":      self._build_view_registrations,
+            "announcements":      self._build_announcements,
+            "reports":            self._build_reports,
             "members":            self._build_members,
             "clubs":              self._build_clubs,
             "attendance":         self._build_attendance,
@@ -125,7 +131,6 @@ class AdminDashboard(tk.Frame):
         make_label(wrap, "Dashboard", font=FONT_TITLE).pack(anchor="w")
         make_label(wrap, "Welcome to College CMS Admin", fg=MUTED).pack(anchor="w", pady=(2, 10))
 
-        # cards
         card_row = tk.Frame(wrap, bg=BG)
         card_row.pack(fill="x", pady=(10, 18))
 
@@ -137,41 +142,112 @@ class AdminDashboard(tk.Frame):
             tk.Label(frame, text=subtitle, bg=SURFACE, fg=MUTED, font=("Helvetica", 8)).pack(anchor="w", padx=10, pady=(2, 12))
             return frame
 
-        total_events = event_svc.get_total_events()
+        events = event_svc.get_all_events()
+        registrations = reg_svc.get_all_registrations()
+        attendance_rows = att_svc.get_all_attendance()
+        total_events = len(events)
         total_members = user_svc.get_total_members()
         total_clubs = event_svc.get_club_count()
-        attendance_today = len([x for x in att_svc.get_all_attendance() if x["status"] == "present"])
+        unmarked_count = len([row for row in attendance_rows if row["status"] == "unmarked"])
 
-        card(card_row, "Total Events", str(total_events), "+12% from last month", ACCENT)
-        card(card_row, "Members", str(total_members), "+8% from last month", ACCENT3)
-        card(card_row, "Clubs", str(total_clubs), "+2 new clubs", ACCENT2)
-        card(card_row, "Attendance Today", str(attendance_today), "87% attendance rate", ACCENT)
+        card(card_row, "Total Events", str(total_events), "All scheduled activities", ACCENT)
+        card(card_row, "Members", str(total_members), "Registered student accounts", ACCENT3)
+        card(card_row, "Clubs", str(total_clubs), "Active student clubs", ACCENT2)
+        card(card_row, "Registrations", str(len(registrations)), f"{unmarked_count} attendance marks pending", ACCENT)
 
-        # recent events table
         lower = tk.Frame(wrap, bg=BG)
         lower.pack(fill="both", expand=True)
 
         left = tk.Frame(lower, bg=BG)
-        left.pack(side="left", fill="both", expand=True, padx=(0, 8))
-        right = tk.Frame(lower, bg=BG, width=260)
+        left.pack(side="left", fill="both", expand=True, padx=(0, 10))
+        right = tk.Frame(lower, bg=BG, width=300)
         right.pack(side="left", fill="y")
+        right.pack_propagate(False)
 
         make_label(left, "Recent Events", font=FONT_HEAD).pack(anchor="w")
         make_label(left, "Overview of your latest events", fg=MUTED).pack(anchor="w", pady=(0, 10))
         cols = ("Event Name", "Date", "Club", "Status")
         tv_frame, tv = make_treeview(left, cols)
         tv_frame.pack(fill="both", expand=True)
-        for ev in event_svc.get_all_events()[:5]:
-            status = "upcoming" if ev.date >= "2026-01-01" else "completed"
+
+        today_iso = date.today().isoformat()
+        for ev in events[:5]:
+            status = "upcoming" if ev.date >= today_iso else "completed"
             tv.insert("", "end", values=(ev.name, ev.date, ev.club, status))
 
         make_button(left, "+ Add Event", lambda: self._show_section("add_event"), color=ACCENT, width=12).pack(anchor="e", pady=(8, 0))
 
-        # mini calendar placeholder
-        make_label(right, "Quick Calendar", font=FONT_HEAD).pack(anchor="w")
-        make_label(right, "March 2026", fg=MUTED).pack(anchor="w", pady=(0, 10))
-        for week in ["Su Mo Tu We Th Fr Sa", " 1  2  3  4  5  6  7", " 8  9 10 11 12 13 14", "15 16 17 18 19 20 21", "22 23 24 25 26 27 28", "29 30 31"]:
-            tk.Label(right, text=week, bg=BG, fg=TEXT, font=("Helvetica", 9)).pack(anchor="w")
+        action_card = tk.Frame(right, bg=SURFACE, padx=14, pady=14,
+                               highlightthickness=1, highlightbackground=BORDER)
+        action_card.pack(fill="x", pady=(0, 12))
+        make_label(action_card, "Quick Actions", font=FONT_HEAD, bg=SURFACE).pack(anchor="w")
+        make_label(action_card, "Open the most-used admin tools", fg=MUTED, bg=SURFACE).pack(anchor="w", pady=(0, 10))
+
+        action_grid = tk.Frame(action_card, bg=SURFACE)
+        action_grid.pack(fill="x")
+        action_grid.columnconfigure(0, weight=1)
+        action_grid.columnconfigure(1, weight=1)
+        make_button(action_grid, "Add Event", lambda: self._show_section("add_event"), color=ACCENT, width=12).grid(row=0, column=0, padx=(0, 8), pady=(0, 8), sticky="ew")
+        make_button(action_grid, "Registrations", lambda: self._show_section("registrations"), color=ACCENT3, width=12).grid(row=0, column=1, pady=(0, 8), sticky="ew")
+        make_button(action_grid, "Announcements", lambda: self._show_section("announcements"), color=ACCENT, width=12).grid(row=1, column=0, padx=(0, 8), pady=(0, 8), sticky="ew")
+        make_button(action_grid, "Reports", lambda: self._show_section("reports"), color=ACCENT3, width=12).grid(row=1, column=1, pady=(0, 8), sticky="ew")
+        make_button(action_grid, "Attendance", lambda: self._show_section("attendance"), color=SURFACE2, width=12).grid(row=2, column=0, padx=(0, 8), sticky="ew")
+        make_button(action_grid, "Calendar", lambda: self._show_section("event_calendar"), color=SURFACE2, width=12).grid(row=2, column=1, sticky="ew")
+
+        insight_card = tk.Frame(right, bg=SURFACE, padx=14, pady=14,
+                                highlightthickness=1, highlightbackground=BORDER)
+        insight_card.pack(fill="both", expand=True)
+        make_label(insight_card, "Event Highlights", font=FONT_HEAD, bg=SURFACE).pack(anchor="w")
+        make_label(insight_card, "Upcoming activity and club momentum", fg=MUTED, bg=SURFACE).pack(anchor="w", pady=(0, 10))
+
+        summary_map = {
+            row["event_name"]: row["total_registered"]
+            for row in reg_svc.get_registration_summary()
+        }
+        upcoming_events = []
+        today = date.today()
+        for ev in events:
+            try:
+                event_day = datetime.strptime(ev.date, "%Y-%m-%d").date()
+            except ValueError:
+                continue
+            if event_day >= today:
+                upcoming_events.append((event_day, ev))
+        upcoming_events.sort(key=lambda item: item[0])
+
+        if upcoming_events:
+            for event_day, ev in upcoming_events[:3]:
+                days_left = (event_day - today).days
+                when_text = "Today" if days_left == 0 else "Tomorrow" if days_left == 1 else f"In {days_left} days"
+                tk.Label(
+                    insight_card,
+                    text=f"• {ev.name}\n  {ev.date} • {ev.club}\n  {summary_map.get(ev.name, 0)} registration(s) • {when_text}",
+                    bg=SURFACE,
+                    fg=TEXT,
+                    font=FONT_SMALL,
+                    justify="left",
+                    anchor="w",
+                    wraplength=250,
+                ).pack(anchor="w", fill="x", pady=(0, 8))
+        else:
+            make_label(insight_card, "No upcoming events yet. Add one to get started.",
+                       fg=MUTED, bg=SURFACE).pack(anchor="w")
+
+        tk.Frame(insight_card, bg=BORDER, height=1).pack(fill="x", pady=8)
+        make_label(insight_card, "Top Clubs", font=FONT_SMALL, fg=ACCENT, bg=SURFACE).pack(anchor="w", pady=(0, 6))
+        club_summary = event_svc.get_club_summary()[:3]
+        if club_summary:
+            for club in club_summary:
+                make_label(
+                    insight_card,
+                    f"{club['club']} • {club['event_count']} event(s)",
+                    fg=TEXT,
+                    bg=SURFACE,
+                    font=FONT_SMALL,
+                ).pack(anchor="w", pady=(0, 4))
+        else:
+            make_label(insight_card, "Club activity will appear here once events are added.",
+                       fg=MUTED, bg=SURFACE, font=FONT_SMALL).pack(anchor="w")
 
     # ══════════════════════════════════════════════════════════════════════
     # Section: Members
@@ -449,8 +525,15 @@ class AdminDashboard(tk.Frame):
         make_label(wrap, "Every student–event pair in the system.",
                    fg=MUTED).pack(anchor="w", pady=(4, 16))
 
-        make_button(wrap, "🔄  Refresh", self._refresh_regs,
-                    color=SURFACE2, width=12).pack(anchor="e", pady=(0, 8))
+        action_row = tk.Frame(wrap, bg=BG)
+        action_row.pack(fill="x", pady=(0, 8))
+        self._reg_count_var = tk.StringVar(value="Total registrations: 0")
+        tk.Label(action_row, textvariable=self._reg_count_var,
+                 bg=BG, fg=ACCENT3, font=FONT_BODY).pack(side="left")
+        make_button(action_row, "⬇ Export CSV", self._export_registrations,
+                    color=ACCENT, width=14).pack(side="right", padx=(8, 0))
+        make_button(action_row, "🔄  Refresh", self._refresh_regs,
+                    color=SURFACE2, width=12).pack(side="right")
 
         cols = ("Student", "Email", "Event", "Date", "Club")
         tv_frame, self._reg_tree = make_treeview(wrap, cols)
@@ -462,14 +545,248 @@ class AdminDashboard(tk.Frame):
 
     def _load_registrations(self):
         self._reg_tree.delete(*self._reg_tree.get_children())
-        for r in reg_svc.get_all_registrations():
+        rows = reg_svc.get_all_registrations()
+        for r in rows:
             self._reg_tree.insert("", "end",
                                   values=(r["username"], r["email"],
                                           r["event_name"], r["date"], r["club"]))
+        self._reg_count_var.set(f"Total registrations: {len(rows)}")
+
+    def _export_registrations(self):
+        path = filedialog.asksaveasfilename(
+            title="Export Registrations",
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*")],
+        )
+        if not path:
+            return
+
+        try:
+            rows = reg_svc.get_all_registrations()
+            with open(path, "w", newline="", encoding="utf-8") as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow(["student", "email", "event", "date", "club"])
+                for row in rows:
+                    writer.writerow([
+                        row["username"],
+                        row["email"],
+                        row["event_name"],
+                        row["date"],
+                        row["club"],
+                    ])
+            show_toast(self, "Registrations exported to CSV.", success=True)
+        except Exception as exc:
+            messagebox.showerror("Export Error", str(exc))
 
     def _refresh_regs(self):
         self._load_registrations()
         show_toast(self, "Registrations refreshed.", success=True)
+
+    # ══════════════════════════════════════════════════════════════════════
+    # Section: Announcements
+    # ══════════════════════════════════════════════════════════════════════
+    def _build_announcements(self):
+        wrap = tk.Frame(self._content, bg=BG, padx=40, pady=30)
+        wrap.pack(fill="both", expand=True)
+
+        make_label(wrap, "Announcements", font=FONT_TITLE).pack(anchor="w")
+        make_label(wrap, "Send updates and reminders to students without changing the design.",
+                   fg=MUTED).pack(anchor="w", pady=(4, 16))
+
+        announce_card = tk.Frame(wrap, bg=SURFACE, padx=18, pady=18,
+                                 highlightthickness=1, highlightbackground=BORDER)
+        announce_card.pack(fill="x", pady=(0, 12))
+        make_label(announce_card, "Send announcement to all students", font=FONT_HEAD, bg=SURFACE).pack(anchor="w")
+        make_label(announce_card, "This message appears in the student Notifications tab.",
+                   fg=MUTED, bg=SURFACE).pack(anchor="w", pady=(2, 8))
+
+        self._announcement_text = tk.Text(
+            announce_card,
+            height=5,
+            bg=SURFACE2,
+            fg=TEXT,
+            insertbackground=TEXT,
+            relief="flat",
+            font=FONT_BODY,
+            wrap="word",
+        )
+        self._announcement_text.pack(fill="x")
+        make_button(announce_card, "📣 Send Announcement", self._send_announcement,
+                    color=ACCENT, width=18).pack(anchor="w", pady=(10, 0))
+
+        reminder_card = tk.Frame(wrap, bg=SURFACE, padx=18, pady=18,
+                                 highlightthickness=1, highlightbackground=BORDER)
+        reminder_card.pack(fill="x")
+        make_label(reminder_card, "Send event reminder", font=FONT_HEAD, bg=SURFACE).pack(anchor="w")
+        make_label(reminder_card, "Choose an event and notify all registered students.",
+                   fg=MUTED, bg=SURFACE).pack(anchor="w", pady=(2, 8))
+
+        self._reminder_event_var = tk.StringVar(value="")
+        self._reminder_combo = ttk.Combobox(
+            reminder_card,
+            textvariable=self._reminder_event_var,
+            state="readonly",
+            font=FONT_BODY,
+        )
+        self._reminder_combo.pack(fill="x", pady=(0, 8))
+
+        self._reminder_note = tk.Text(
+            reminder_card,
+            height=4,
+            bg=SURFACE2,
+            fg=TEXT,
+            insertbackground=TEXT,
+            relief="flat",
+            font=FONT_BODY,
+            wrap="word",
+        )
+        self._reminder_note.pack(fill="x")
+
+        btn_row = tk.Frame(reminder_card, bg=SURFACE)
+        btn_row.pack(fill="x", pady=(10, 0))
+        make_button(btn_row, "🔄 Refresh Events", self._load_reminder_events,
+                    color=SURFACE2, width=16).pack(side="left")
+        make_button(btn_row, "⏰ Send Reminder", self._send_event_reminder,
+                    color=ACCENT3, width=16).pack(side="left", padx=(8, 0))
+
+        self._load_reminder_events()
+
+    def _load_reminder_events(self):
+        events = event_svc.get_all_events()
+        options = [f"{ev.id} | {ev.name} ({ev.date})" for ev in events]
+        self._reminder_combo["values"] = options
+        if options:
+            if self._reminder_event_var.get() not in options:
+                self._reminder_event_var.set(options[0])
+        else:
+            self._reminder_event_var.set("")
+
+    def _send_announcement(self):
+        message = self._announcement_text.get("1.0", "end").strip()
+        try:
+            sent_count = notif_svc.broadcast_notification_to_students(message)
+            self._announcement_text.delete("1.0", "end")
+            show_toast(self, f"Announcement sent to {sent_count} student(s).", success=True)
+        except ValueError as exc:
+            messagebox.showwarning("Announcements", str(exc))
+
+    def _send_event_reminder(self):
+        selected = self._reminder_event_var.get().strip()
+        if not selected:
+            messagebox.showwarning("Reminder", "Please choose an event first.")
+            return
+
+        try:
+            event_id = int(selected.split("|", 1)[0].strip())
+            extra_note = self._reminder_note.get("1.0", "end").strip()
+            sent_count = notif_svc.send_event_reminder(event_id, extra_note)
+            self._reminder_note.delete("1.0", "end")
+            show_toast(self, f"Reminder sent to {sent_count} student(s).", success=True)
+        except ValueError as exc:
+            messagebox.showwarning("Reminder", str(exc))
+
+    # ══════════════════════════════════════════════════════════════════════
+    # Section: Reports
+    # ══════════════════════════════════════════════════════════════════════
+    def _build_reports(self):
+        wrap = tk.Frame(self._content, bg=BG, padx=40, pady=30)
+        wrap.pack(fill="both", expand=True)
+
+        make_label(wrap, "Reports", font=FONT_TITLE).pack(anchor="w")
+        make_label(wrap, "Review event participation and attendance performance.",
+                   fg=MUTED).pack(anchor="w", pady=(4, 16))
+
+        action_row = tk.Frame(wrap, bg=BG)
+        action_row.pack(fill="x", pady=(0, 8))
+        self._report_summary_var = tk.StringVar(value="Loading report summary...")
+        tk.Label(action_row, textvariable=self._report_summary_var,
+                 bg=BG, fg=ACCENT3, font=FONT_SMALL).pack(side="left")
+        make_button(action_row, "⬇ Export Report", self._export_report_csv,
+                    color=ACCENT, width=15).pack(side="right")
+        make_button(action_row, "🔄 Refresh", self._load_reports,
+                    color=SURFACE2, width=12).pack(side="right", padx=(0, 8))
+
+        cols = ("Event", "Date", "Club", "Registered", "Present", "Absent", "Attendance %")
+        tv_frame, self._report_tree = make_treeview(wrap, cols)
+        tv_frame.pack(fill="both", expand=True)
+        self._report_tree.column("Event", width=200, anchor="w")
+        self._report_tree.column("Club", width=130, anchor="w")
+        for col in ("Registered", "Present", "Absent", "Attendance %"):
+            self._report_tree.column(col, width=95, anchor="center")
+
+        self._load_reports()
+
+    def _load_reports(self):
+        summary_rows = reg_svc.get_registration_summary()
+        attendance_map = {
+            row["event_name"]: row for row in att_svc.get_attendance_summary()
+        }
+
+        self._report_tree.delete(*self._report_tree.get_children())
+        total_registered = 0
+        best_event_name = "None"
+        best_total = -1
+        total_rate = 0.0
+
+        for row in summary_rows:
+            registered = row.get("total_registered", 0) or 0
+            total_registered += registered
+            if registered > best_total:
+                best_total = registered
+                best_event_name = row["event_name"]
+
+            attendance_row = attendance_map.get(row["event_name"], {})
+            present = attendance_row.get("present", 0) or 0
+            absent = attendance_row.get("absent", 0) or 0
+            rate = attendance_row.get("attendance_rate", 0.0) or 0.0
+            total_rate += rate
+
+            self._report_tree.insert("", "end", values=(
+                row["event_name"],
+                row["date"],
+                row["club"],
+                registered,
+                present,
+                absent,
+                f"{rate}%",
+            ))
+
+        avg_rate = round(total_rate / len(summary_rows), 1) if summary_rows else 0.0
+        self._report_summary_var.set(
+            f"Events: {len(summary_rows)} • Registrations: {total_registered} • Avg attendance: {avg_rate}% • Top event: {best_event_name}"
+        )
+
+    def _export_report_csv(self):
+        path = filedialog.asksaveasfilename(
+            title="Export Report",
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*")],
+        )
+        if not path:
+            return
+
+        try:
+            summary_rows = reg_svc.get_registration_summary()
+            attendance_map = {
+                row["event_name"]: row for row in att_svc.get_attendance_summary()
+            }
+            with open(path, "w", newline="", encoding="utf-8") as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow(["event", "date", "club", "registered", "present", "absent", "attendance_rate"])
+                for row in summary_rows:
+                    attendance_row = attendance_map.get(row["event_name"], {})
+                    writer.writerow([
+                        row["event_name"],
+                        row["date"],
+                        row["club"],
+                        row.get("total_registered", 0) or 0,
+                        attendance_row.get("present", 0) or 0,
+                        attendance_row.get("absent", 0) or 0,
+                        attendance_row.get("attendance_rate", 0.0) or 0.0,
+                    ])
+            show_toast(self, "Report exported to CSV.", success=True)
+        except Exception as exc:
+            messagebox.showerror("Report Export", str(exc))
 
     # ══════════════════════════════════════════════════════════════════════
     # Section: Attendance
@@ -535,11 +852,12 @@ class AdminDashboard(tk.Frame):
         make_label(wrap, "Event Attendance Records", font=FONT_HEAD).pack(anchor="w")
         make_label(wrap, "Detailed attendance information for all events", fg=MUTED).pack(anchor="w", pady=(0, 10))
 
-        cols = ("Event", "Date", "Registered", "Present", "Absent", "Attendance %", "Actions")
+        cols = ("Event", "Date", "Club", "Registered", "Present", "Absent", "Attendance %")
         tv_frame, self._summary_tree = make_treeview(wrap, cols)
         tv_frame.pack(fill="both", expand=True)
         for c in ("Registered", "Present", "Absent", "Attendance %"):
             self._summary_tree.column(c, width=90, anchor="center")
+        self._summary_tree.column("Club", width=140, anchor="w")
 
         self._load_attendance_summary()
 
@@ -575,7 +893,6 @@ class AdminDashboard(tk.Frame):
                 row.get("present", 0),
                 row.get("absent", 0),
                 f"{row.get('attendance_rate', 0.0)}%",
-                "",
             ))
 
     def _load_detail_attendance(self):
