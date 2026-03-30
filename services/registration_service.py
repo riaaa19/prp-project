@@ -64,6 +64,45 @@ def get_all_registrations():
         conn.close()
 
 
+def cancel_registration(user_id: int, event_id: int):
+    """Remove a student's registration and any linked attendance record."""
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT 1 FROM registrations WHERE user_id = ? AND event_id = ?",
+            (user_id, event_id),
+        )
+        if cur.fetchone() is None:
+            raise ValueError("You are not registered for this event.")
+
+        cur.execute("DELETE FROM attendance WHERE user_id = ? AND event_id = ?", (user_id, event_id))
+        cur.execute("DELETE FROM registrations WHERE user_id = ? AND event_id = ?", (user_id, event_id))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_registration_summary():
+    """Return registration totals per event for dashboard insights."""
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT e.id, e.name AS event_name, e.date, e.club,
+                   COUNT(r.user_id) AS total_registered
+            FROM events e
+            LEFT JOIN registrations r ON r.event_id = e.id
+            GROUP BY e.id
+            ORDER BY e.date
+            """
+        )
+        return [dict(row) for row in cur.fetchall()]
+    finally:
+        conn.close()
+
+
 def get_event_registrations(event_id: int):
     """Return list of registrations for a specific event."""
     conn = get_connection()
