@@ -302,6 +302,14 @@ class AdminDashboard(tk.Frame):
 
         self._load_clubs()
 
+        # action buttons
+        btn_row = tk.Frame(wrap, bg=BG)
+        btn_row.pack(fill="x", pady=(12, 0))
+        make_button(btn_row, "✏️  Edit Selected", self._edit_club,
+                    color=ACCENT, width=16).pack(side="left", padx=(0, 8))
+        make_button(btn_row, "🗑  Delete Selected", self._delete_club,
+                    color=ACCENT2, width=16).pack(side="left")
+
     def _load_clubs(self):
         self._clubs_tree.delete(*self._clubs_tree.get_children())
         for club in club_svc.get_all_clubs():
@@ -322,6 +330,73 @@ class AdminDashboard(tk.Frame):
             show_toast(self, "Club added successfully!", success=True)
         except ValueError as exc:
             messagebox.showwarning("Add Club", str(exc))
+
+    def _get_selected_club(self):
+        sel = self._clubs_tree.selection()
+        if not sel:
+            messagebox.showwarning("No selection", "Please select a club first.")
+            return None
+        return self._clubs_tree.item(sel[0])["values"]   # [name, description, created_at]
+
+    def _edit_club(self):
+        row = self._get_selected_club()
+        if row is None:
+            return
+        name, description, created_at = row
+        self._open_club_edit_dialog(name, description)
+
+    def _delete_club(self):
+        row = self._get_selected_club()
+        if row is None:
+            return
+        name = row[0]
+        if messagebox.askyesno("Confirm Delete", f"Delete club '{name}'? This will remove the club from the system."):
+            try:
+                club_svc.delete_club(name)
+                show_toast(self, f"'{name}' deleted.", success=False)
+                self._load_clubs()
+            except Exception as e:
+                messagebox.showerror("Delete Error", str(e))
+
+    def _open_club_edit_dialog(self, name, description):
+        dlg = tk.Toplevel(self)
+        dlg.title("Edit Club")
+        dlg.configure(bg=SURFACE)
+        dlg.geometry("400x260")
+        dlg.resizable(False, False)
+        dlg.grab_set()
+
+        tk.Label(dlg, text="Edit Club", bg=SURFACE, fg=TEXT,
+                 font=FONT_HEAD).pack(pady=(20, 10))
+
+        labels_vals = [("Club Name", name), ("Description", description)]
+        entries = []
+        for lbl, val in labels_vals:
+            tk.Label(dlg, text=lbl, bg=SURFACE, fg=MUTED,
+                     font=("Helvetica", 9, "bold"), anchor="w").pack(fill="x", padx=30)
+            en = make_entry(dlg, width=38)
+            en.insert(0, val)
+            en.pack(fill="x", padx=30, pady=(2, 8))
+            entries.append(en)
+
+        # Name field should be read-only
+        entries[0].config(state="readonly")
+
+        err_var = tk.StringVar()
+        tk.Label(dlg, textvariable=err_var, bg=SURFACE, fg=ACCENT2,
+                 font=FONT_SMALL).pack()
+
+        def _save():
+            try:
+                new_desc = entries[1].get()
+                club_svc.update_club(name, new_desc)
+                show_toast(self, "Club updated!", success=True)
+                self._load_clubs()
+                dlg.destroy()
+            except ValueError as exc:
+                err_var.set(str(exc))
+
+        make_button(dlg, "💾  Save Changes", _save, width=20).pack(pady=12)
 
     # ══════════════════════════════════════════════════════════════════════
     # Section: Add Event

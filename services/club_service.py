@@ -45,3 +45,34 @@ def add_club(name: str, description: str = ""):
         conn.commit()
     finally:
         conn.close()
+
+
+def update_club(name: str, description: str = ""):
+    """Update an existing club by name. Raises ValueError on invalid input."""
+    clean_name = (name or "").strip()
+    clean_desc = (description or "").strip()
+
+    if not clean_name:
+        raise ValueError("Club name is required.")
+
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE clubs SET description = ? WHERE LOWER(name) = LOWER(?)",
+            (clean_desc, clean_name),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def delete_club(name: str):
+    """Delete a club by name."""
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM clubs WHERE LOWER(name) = LOWER(?)", (name,))
+        conn.commit()
+    finally:
+        conn.close()
