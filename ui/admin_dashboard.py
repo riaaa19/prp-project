@@ -22,7 +22,7 @@ import services.notification_service as notif_svc
 from ui.components import (
     BG, SURFACE, SURFACE2, ACCENT, ACCENT2, ACCENT3,
     TEXT, MUTED, BORDER, FONT_TITLE, FONT_HEAD, FONT_BODY, FONT_BTN, FONT_SMALL,
-    make_frame, make_label, make_entry, make_button, make_treeview, show_toast,
+    make_frame, make_card, make_label, make_entry, make_button, make_treeview, show_toast,
     apply_global_style,
 )
 
@@ -49,14 +49,14 @@ class AdminDashboard(tk.Frame):
         sidebar.pack_propagate(False)
 
         # branding
-        tk.Label(sidebar, text="⚙  Admin Panel", bg=SURFACE, fg=TEXT,
-                 font=FONT_HEAD, pady=20).pack(fill="x", padx=16)
+        tk.Label(sidebar, text="Campus CMS Admin", bg=SURFACE, fg=ACCENT,
+                 font=("Segoe UI", 20, "bold"), pady=18).pack(fill="x", padx=16)
         tk.Frame(sidebar, bg=BORDER, height=1).pack(fill="x", padx=16)
 
         tk.Label(sidebar, text=f"Hi, {self._user.username}",
-                 bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(anchor="w", padx=16, pady=(8, 0))
+                 bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(anchor="w", padx=16, pady=(12, 0))
         tk.Label(sidebar, text="Administrator",
-                 bg=SURFACE, fg=ACCENT, font=("Helvetica", 8, "bold")).pack(anchor="w", padx=16, pady=(0, 12))
+                 bg=SURFACE, fg=ACCENT, font=("Segoe UI", 8, "bold")).pack(anchor="w", padx=16, pady=(0, 12))
         tk.Frame(sidebar, bg=BORDER, height=1).pack(fill="x", padx=16)
 
         # nav buttons
@@ -66,23 +66,31 @@ class AdminDashboard(tk.Frame):
             ("📅  Events",           "manage_events"),
             ("📣  Announcements",    "announcements"),
             ("📈  Reports",          "reports"),
-            ("�  Registrations",    "registrations"),
-            ("�👥  Members",          "members"),
+            ("🔔  Registrations",    "registrations"),
+            ("👥  Members",          "members"),
             ("🏛  Clubs",            "clubs"),
             ("📝  Attendance",      "attendance"),
             ("📆  Calendar",        "event_calendar"),
         ]
         for label, key in nav_items:
-            btn = tk.Button(sidebar, text=label, bg=SURFACE, fg=TEXT,
-                            activebackground=ACCENT, activeforeground="white",
-                            font=FONT_BODY, relief="flat", bd=0,
-                            anchor="w", padx=20, pady=12, cursor="hand2",
-                            command=lambda k=key: self._show_section(k))
-            btn.pack(fill="x")
-            btn.bind("<Enter>", lambda e, b=btn: b.config(bg=SURFACE2))
-            btn.bind("<Leave>", lambda e, b=btn, k=key: b.config(
-                bg=ACCENT if self._active_section == k else SURFACE2))
-            self._nav_btns[key] = btn
+            def make_nav_btn(lbl, ky):
+                btn = tk.Button(sidebar, text=lbl, bg=SURFACE, fg=TEXT,
+                                activebackground=ACCENT, activeforeground="white",
+                                font=("Segoe UI", 11), relief="flat", bd=0,
+                                anchor="w", padx=18, pady=14, cursor="hand2",
+                                highlightthickness=0,
+                                command=lambda k=ky: self._show_section(k))
+                btn.pack(fill="x", padx=8, pady=2)
+                def _on_enter(e, btn=btn, key=ky):
+                    if self._active_section != key:
+                        btn.config(bg=SURFACE2)
+                def _on_leave(e, btn=btn, key=ky):
+                    if self._active_section != key:
+                        btn.config(bg=SURFACE)
+                btn.bind("<Enter>", _on_enter)
+                btn.bind("<Leave>", _on_leave)
+                self._nav_btns[ky] = btn
+            make_nav_btn(label, key)
 
         # logout at bottom
         tk.Frame(sidebar, bg=BORDER, height=1).pack(fill="x", padx=16, side="bottom", pady=10)
@@ -97,9 +105,12 @@ class AdminDashboard(tk.Frame):
     # Navigation
     # ══════════════════════════════════════════════════════════════════════
     def _show_section(self, key: str):
-        # update sidebar highlight
+        # update sidebar highlight with premium active state
         for k, btn in self._nav_btns.items():
-            btn.config(bg=ACCENT if k == key else SURFACE)
+            if k == key:
+                btn.config(bg=ACCENT, fg="white", relief="flat")
+            else:
+                btn.config(bg=SURFACE, fg=TEXT, relief="flat")
         self._active_section = key
 
         # clear content
@@ -135,11 +146,11 @@ class AdminDashboard(tk.Frame):
         card_row.pack(fill="x", pady=(10, 18))
 
         def card(parent, title, value, subtitle, accent):
-            frame = tk.Frame(parent, bg=SURFACE, bd=0, highlightthickness=0)
+            frame = make_card(parent, bg=SURFACE, padx=16, pady=18)
             frame.pack(side="left", expand=True, fill="x", padx=6)
-            tk.Label(frame, text=title, bg=SURFACE, fg=MUTED, font=("Helvetica", 9)).pack(anchor="w", padx=10, pady=(10, 0))
-            tk.Label(frame, text=value, bg=SURFACE, fg=accent, font=("Helvetica", 24, "bold")).pack(anchor="w", padx=10, pady=(2, 0))
-            tk.Label(frame, text=subtitle, bg=SURFACE, fg=MUTED, font=("Helvetica", 8)).pack(anchor="w", padx=10, pady=(2, 12))
+            tk.Label(frame, text=title, bg=SURFACE, fg=MUTED, font=("Segoe UI", 9)).pack(anchor="w", pady=(0, 6))
+            tk.Label(frame, text=value, bg=SURFACE, fg=accent, font=("Segoe UI", 24, "bold")).pack(anchor="w", pady=(0, 6))
+            tk.Label(frame, text=subtitle, bg=SURFACE, fg=MUTED, font=("Segoe UI", 9)).pack(anchor="w")
             return frame
 
         events = event_svc.get_all_events()
@@ -177,8 +188,7 @@ class AdminDashboard(tk.Frame):
 
         make_button(left, "+ Add Event", lambda: self._show_section("add_event"), color=ACCENT, width=12).pack(anchor="e", pady=(8, 0))
 
-        action_card = tk.Frame(right, bg=SURFACE, padx=14, pady=14,
-                               highlightthickness=1, highlightbackground=BORDER)
+        action_card = make_card(right, bg=SURFACE, padx=14, pady=14)
         action_card.pack(fill="x", pady=(0, 12))
         make_label(action_card, "Quick Actions", font=FONT_HEAD, bg=SURFACE).pack(anchor="w")
         make_label(action_card, "Open the most-used admin tools", fg=MUTED, bg=SURFACE).pack(anchor="w", pady=(0, 10))
@@ -194,8 +204,7 @@ class AdminDashboard(tk.Frame):
         make_button(action_grid, "Attendance", lambda: self._show_section("attendance"), color=SURFACE2, width=12).grid(row=2, column=0, padx=(0, 8), sticky="ew")
         make_button(action_grid, "Calendar", lambda: self._show_section("event_calendar"), color=SURFACE2, width=12).grid(row=2, column=1, sticky="ew")
 
-        insight_card = tk.Frame(right, bg=SURFACE, padx=14, pady=14,
-                                highlightthickness=1, highlightbackground=BORDER)
+        insight_card = make_card(right, bg=SURFACE, padx=14, pady=14)
         insight_card.pack(fill="both", expand=True)
         make_label(insight_card, "Event Highlights", font=FONT_HEAD, bg=SURFACE).pack(anchor="w")
         make_label(insight_card, "Upcoming activity and club momentum", fg=MUTED, bg=SURFACE).pack(anchor="w", pady=(0, 10))

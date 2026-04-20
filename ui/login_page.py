@@ -7,7 +7,7 @@ import tkinter as tk
 from ui.components import (
     BG, SURFACE, SURFACE2, ACCENT, ACCENT2, ACCENT3,
     TEXT, MUTED, BORDER, FONT_TITLE, FONT_HEAD, FONT_BODY, FONT_BTN, FONT_SMALL,
-    make_frame, make_label, make_entry, make_button, show_toast,
+    make_frame, make_card, make_label, make_entry, make_button, show_toast,
 )
 from services.auth_service import login, register_user
 
@@ -23,24 +23,47 @@ class AuthPage(tk.Frame):
 
     def _build(self):
         self.columnconfigure(1, weight=1)
+        self.rowconfigure(0, weight=1)
 
-        sidebar = tk.Frame(self, bg=SURFACE, width=220)
-        sidebar.pack(side="left", fill="y")
-        sidebar.pack_propagate(False)
+        hero_panel = tk.Frame(self, bg=SURFACE, width=360)
+        hero_panel.pack(side="left", fill="y")
+        hero_panel.pack_propagate(False)
 
-        tk.Label(sidebar, text="🎓 Welcome", bg=SURFACE, fg=TEXT,
-                 font=FONT_HEAD, pady=20).pack(fill="x", padx=16)
 
-        self._signin_btn = make_button(sidebar, "Sign In", lambda: self._switch("signin"), width=20)
-        self._signin_btn.pack(pady=(10, 4), padx=16)
-        self._signup_btn = make_button(sidebar, "Sign Up", lambda: self._switch("signup"), width=20)
-        self._signup_btn.pack(pady=(0, 8), padx=16)
+        hero_content = tk.Frame(hero_panel, bg=SURFACE)
+        hero_content.place(relx=0.5, rely=0.5, anchor="center", width=340)
+        tk.Label(hero_content, text="Campus Club Manager", bg=SURFACE, fg=ACCENT,
+                 font=("Segoe UI", 28, "bold"), wraplength=320, anchor="w", justify="left").pack(anchor="w", pady=(0, 18), fill="x")
+        tk.Label(hero_content, text="Run college events the way students expect",
+                 bg=SURFACE, fg=TEXT, font=("Segoe UI", 18, "bold"), wraplength=320, anchor="w", justify="left").pack(anchor="w", fill="x")
+        tk.Label(hero_content,
+                 text="Coordinate clubs, manage registrations, and track attendance from a single modern dashboard.",
+                 bg=SURFACE, fg=MUTED, font=FONT_BODY, wraplength=320, anchor="w", justify="left").pack(anchor="w", pady=(12, 24), fill="x")
 
-        tk.Label(sidebar, text="Already have an account? Use Sign In",
-                 bg=SURFACE, fg=MUTED, font=("Helvetica", 8), wraplength=200, justify="center").pack(pady=20)
+        for title, desc in [
+            ("Smart Decision Engine", "Group-friendly event suggestions with smarter matching."),
+            ("Conflict Resolver", "See and fix schedule clashes in an instant."),
+            ("Expense Splitter", "Keep finances clear and fair for every member."),
+        ]:
+            feature_card = make_card(hero_content, bg=SURFACE2, padx=14, pady=12)
+            feature_card.pack(fill="x", pady=6)
+            tk.Label(feature_card, text=title, bg=SURFACE2, fg=TEXT,
+                     font=("Segoe UI", 11, "bold"), wraplength=300, anchor="w", justify="left").pack(anchor="w", fill="x")
+            tk.Label(feature_card, text=desc, bg=SURFACE2, fg=MUTED,
+                     font=FONT_SMALL, wraplength=300, anchor="w", justify="left").pack(anchor="w", pady=(4, 0), fill="x")
 
-        self._content = tk.Frame(self, bg=BG)
-        self._content.pack(side="left", fill="both", expand=True)
+        content_area = tk.Frame(self, bg=BG)
+        content_area.pack(side="left", fill="both", expand=True)
+
+        tab_row = tk.Frame(content_area, bg=BG)
+        tab_row.pack(fill="x", pady=(28, 12), padx=24)
+        self._signin_btn = make_button(tab_row, "Sign In", lambda: self._switch("signin"), width=16)
+        self._signin_btn.pack(side="left", padx=(0, 8))
+        self._signup_btn = make_button(tab_row, "Sign Up", lambda: self._switch("signup"), color=SURFACE2, width=16)
+        self._signup_btn.pack(side="left")
+
+        self._content = tk.Frame(content_area, bg=BG)
+        self._content.pack(fill="both", expand=True)
 
         self._switch("signin")
 
@@ -69,28 +92,28 @@ class SignInPanel(tk.Frame):
         self._build()
 
     def _build(self):
-        box = tk.Frame(self, bg=SURFACE, padx=40, pady=40, bd=0, highlightthickness=1, highlightbackground=BORDER)
+        box = make_card(self, bg=SURFACE2, padx=40, pady=40)
         box.place(relx=0.5, rely=0.5, anchor="center", width=460, height=460)
 
-        make_label(box, "Sign In", font=FONT_TITLE).pack(pady=(0, 16))
+        make_label(box, "Sign In", font=FONT_TITLE).pack(pady=(0, 20))
 
-        # Role tabs (Student / Admin) displayed above email
         self._role_var = tk.StringVar(value="student")
-        role_tabs = tk.Frame(box, bg=BG)
+        role_tabs = tk.Frame(box, bg=SURFACE2)
         role_tabs.pack(fill="x", pady=(0, 18))
 
         def make_role_tab(label, value):
             btn = tk.Label(role_tabs, text=label,
-                           bg=ACCENT if self._role_var.get()==value else SURFACE2,
+                           bg=ACCENT if self._role_var.get()==value else SURFACE,
                            fg="white" if self._role_var.get()==value else TEXT,
-                           font=("Helvetica", 10, "bold"), bd=1, relief="ridge", padx=16, pady=8, cursor="hand2")
-            btn.pack(side="left", expand=True, fill="x", padx=2)
+                           font=("Segoe UI", 10, "bold"), bd=0, relief="flat",
+                           padx=18, pady=10, cursor="hand2")
+            btn.pack(side="left", expand=True, fill="x", padx=4)
 
             def _select_role(evt=None):
                 self._role_var.set(value)
                 for child in role_tabs.winfo_children():
                     child_value = "student" if child.cget("text")=="Student" else "admin"
-                    child.config(bg=ACCENT if child_value == self._role_var.get() else SURFACE2,
+                    child.config(bg=ACCENT if child_value == self._role_var.get() else SURFACE,
                                  fg="white" if child_value == self._role_var.get() else TEXT)
 
             btn.bind("<Button-1>", _select_role)
@@ -99,18 +122,18 @@ class SignInPanel(tk.Frame):
         self._student_tab = make_role_tab("Student", "student")
         self._admin_tab = make_role_tab("Admin", "admin")
 
-        make_label(box, "Email", fg=MUTED, font=("Helvetica", 9, "bold")).pack(anchor="w")
+        make_label(box, "Email", fg=MUTED, font=("Segoe UI", 9, "bold")).pack(anchor="w")
         self._email = make_entry(box, width=36)
-        self._email.pack(pady=(4, 10))
+        self._email.pack(pady=(6, 12))
 
-        make_label(box, "Password", fg=MUTED, font=("Helvetica", 9, "bold")).pack(anchor="w")
+        make_label(box, "Password", fg=MUTED, font=("Segoe UI", 9, "bold")).pack(anchor="w")
         self._password = make_entry(box, show="●", width=36)
-        self._password.pack(pady=(4, 10))
+        self._password.pack(pady=(6, 18))
 
         self._err = tk.StringVar()
-        tk.Label(box, textvariable=self._err, bg=SURFACE, fg=ACCENT2, font=FONT_SMALL).pack(pady=(4, 12))
+        tk.Label(box, textvariable=self._err, bg=SURFACE2, fg=ACCENT2, font=FONT_SMALL).pack(pady=(0, 16))
 
-        make_button(box, "Sign In", self._try_login, width=22).pack(pady=(8, 0))
+        make_button(box, "Sign In", self._try_login, width=24).pack(pady=(4, 0))
 
     def _try_login(self):
         self._err.set("")
@@ -133,34 +156,33 @@ class SignUpPanel(tk.Frame):
         self._build()
 
     def _build(self):
-        box = tk.Frame(self, bg=SURFACE, padx=40, pady=40, bd=0, highlightthickness=1, highlightbackground=BORDER)
+        box = make_card(self, bg=SURFACE2, padx=40, pady=40)
         box.place(relx=0.5, rely=0.5, anchor="center", width=500, height=520)
 
-        make_label(box, "Sign Up", font=FONT_TITLE).pack(pady=(0, 16))
+        make_label(box, "Create Account", font=FONT_TITLE).pack(pady=(0, 20))
 
-        make_label(box, "Full Name", fg=MUTED, font=("Helvetica", 9, "bold")).pack(anchor="w")
+        make_label(box, "Full Name", fg=MUTED, font=("Segoe UI", 9, "bold")).pack(anchor="w")
         self._username = make_entry(box, width=36)
-        self._username.pack(pady=(4, 10))
+        self._username.pack(pady=(6, 12))
 
-        make_label(box, "Email", fg=MUTED, font=("Helvetica", 9, "bold")).pack(anchor="w")
+        make_label(box, "Email", fg=MUTED, font=("Segoe UI", 9, "bold")).pack(anchor="w")
         self._email = make_entry(box, width=36)
-        self._email.pack(pady=(4, 10))
+        self._email.pack(pady=(6, 12))
 
-        make_label(box, "Password", fg=MUTED, font=("Helvetica", 9, "bold")).pack(anchor="w")
+        make_label(box, "Password", fg=MUTED, font=("Segoe UI", 9, "bold")).pack(anchor="w")
         self._password = make_entry(box, show="●", width=36)
-        self._password.pack(pady=(4, 10))
+        self._password.pack(pady=(6, 12))
 
-        make_label(box, "Confirm Password", fg=MUTED, font=("Helvetica", 9, "bold")).pack(anchor="w")
+        make_label(box, "Confirm Password", fg=MUTED, font=("Segoe UI", 9, "bold")).pack(anchor="w")
         self._confirm = make_entry(box, show="●", width=36)
-        self._confirm.pack(pady=(4, 10))
+        self._confirm.pack(pady=(6, 18))
 
         self._err = tk.StringVar()
-        tk.Label(box, textvariable=self._err, bg=SURFACE, fg=ACCENT2, font=FONT_SMALL).pack(pady=(4, 12))
+        tk.Label(box, textvariable=self._err, bg=SURFACE2, fg=ACCENT2, font=FONT_SMALL).pack(pady=(0, 16))
 
-        make_button(box, "Create Account", self._try_signup, width=22).pack(pady=(8, 0))
-
-        make_button(box, "← Back to Sign In", self._back_to_signin, color=SURFACE2, width=22).pack(pady=(10, 0))
-        tk.Label(box, text="Already registered? Use the button above.", bg=SURFACE, fg=MUTED, font=("Helvetica", 8)).pack(pady=(8, 0))
+        make_button(box, "Create Account", self._try_signup, width=24).pack(pady=(4, 0))
+        make_button(box, "← Back to Sign In", self._back_to_signin, color=SURFACE, width=24).pack(pady=(12, 0))
+        tk.Label(box, text="Already registered? Use the button above.", bg=SURFACE2, fg=MUTED, font=("Segoe UI", 8)).pack(pady=(8, 0))
 
     def _try_signup(self):
         self._err.set("")

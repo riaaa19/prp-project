@@ -19,7 +19,7 @@ import services.notification_service as notif_svc
 from ui.components import (
     BG, SURFACE, SURFACE2, ACCENT, ACCENT2, ACCENT3,
     TEXT, MUTED, BORDER, FONT_TITLE, FONT_HEAD, FONT_BODY, FONT_BTN, FONT_SMALL,
-    make_frame, make_label, make_entry, make_button, make_treeview, show_toast,
+    make_frame, make_card, make_label, make_entry, make_button, make_treeview, show_toast,
 )
 
 
@@ -44,35 +44,43 @@ class StudentDashboard(tk.Frame):
         sidebar.pack(side="left", fill="y")
         sidebar.pack_propagate(False)
 
-        tk.Label(sidebar, text="🎓  Student Hub", bg=SURFACE, fg=TEXT,
-                 font=FONT_HEAD, pady=20).pack(fill="x", padx=16)
+        tk.Label(sidebar, text="Campus Club Hub", bg=SURFACE, fg=ACCENT3,
+                 font=("Segoe UI", 20, "bold"), pady=18).pack(fill="x", padx=16)
         tk.Frame(sidebar, bg=BORDER, height=1).pack(fill="x", padx=16)
 
         tk.Label(sidebar, text=f"Hi, {self._user.username}",
-                 bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(anchor="w", padx=16, pady=(8, 0))
+                 bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(anchor="w", padx=16, pady=(12, 0))
         tk.Label(sidebar, text="Student",
-                 bg=SURFACE, fg=ACCENT3, font=("Helvetica", 8, "bold")).pack(anchor="w", padx=16, pady=(0, 12))
+                 bg=SURFACE, fg=ACCENT3, font=("Segoe UI", 8, "bold")).pack(anchor="w", padx=16, pady=(0, 12))
         tk.Frame(sidebar, bg=BORDER, height=1).pack(fill="x", padx=16)
 
         self._nav_btns = {}
         nav_items = [
             ("🏠  Overview",      "overview"),
             ("📅  View Events",   "view_events"),
-            ("✏️   Register",      "register"),
+            ("✏️  Register",     "register"),
             ("🎟  My Events",     "my_events"),
             ("🔔  Notifications", "notifications"),
         ]
         for label, key in nav_items:
-            btn = tk.Button(sidebar, text=label, bg=SURFACE, fg=TEXT,
-                            activebackground=ACCENT, activeforeground="white",
-                            font=FONT_BODY, relief="flat", bd=0,
-                            anchor="w", padx=20, pady=12, cursor="hand2",
-                            command=lambda k=key: self._show_section(k))
-            btn.pack(fill="x")
-            btn.bind("<Enter>", lambda e, b=btn: b.config(bg=SURFACE2))
-            btn.bind("<Leave>", lambda e, b=btn, k=key: b.config(
-                bg=ACCENT if self._active_section == k else SURFACE2))
-            self._nav_btns[key] = btn
+            def make_nav_btn(lbl, ky):
+                btn = tk.Button(sidebar, text=lbl, bg=SURFACE, fg=TEXT,
+                                activebackground=ACCENT, activeforeground="white",
+                                font=("Segoe UI", 11), relief="flat", bd=0,
+                                anchor="w", padx=18, pady=14, cursor="hand2",
+                                highlightthickness=0,
+                                command=lambda k=ky: self._show_section(k))
+                btn.pack(fill="x", padx=8, pady=2)
+                def _on_enter(e, btn=btn, key=ky):
+                    if self._active_section != key:
+                        btn.config(bg=SURFACE2)
+                def _on_leave(e, btn=btn, key=ky):
+                    if self._active_section != key:
+                        btn.config(bg=SURFACE)
+                btn.bind("<Enter>", _on_enter)
+                btn.bind("<Leave>", _on_leave)
+                self._nav_btns[ky] = btn
+            make_nav_btn(label, key)
 
         tk.Frame(sidebar, bg=BORDER, height=1).pack(fill="x", padx=16, side="bottom", pady=10)
         make_button(sidebar, "🚪  Logout", self._on_logout,
@@ -87,7 +95,10 @@ class StudentDashboard(tk.Frame):
     # ══════════════════════════════════════════════════════════════════════
     def _show_section(self, key: str):
         for k, btn in self._nav_btns.items():
-            btn.config(bg=ACCENT if k == key else SURFACE)
+            if k == key:
+                btn.config(bg=ACCENT, fg="white", relief="flat")
+            else:
+                btn.config(bg=SURFACE, fg=TEXT, relief="flat")
         self._active_section = key
 
         for w in self._content.winfo_children():
@@ -181,11 +192,11 @@ class StudentDashboard(tk.Frame):
         card_row.pack(fill="x", pady=(6, 16))
 
         def summary_card(parent, title, value, note, accent):
-            card = tk.Frame(parent, bg=SURFACE, padx=14, pady=12)
+            card = make_card(parent, bg=SURFACE, padx=16, pady=16)
             card.pack(side="left", expand=True, fill="x", padx=6)
-            tk.Label(card, text=title, bg=SURFACE, fg=MUTED, font=("Helvetica", 9)).pack(anchor="w")
-            tk.Label(card, text=str(value), bg=SURFACE, fg=accent, font=("Helvetica", 24, "bold")).pack(anchor="w", pady=(2, 0))
-            tk.Label(card, text=note, bg=SURFACE, fg=MUTED, font=("Helvetica", 8)).pack(anchor="w", pady=(2, 0))
+            tk.Label(card, text=title, bg=SURFACE, fg=MUTED, font=("Segoe UI", 9)).pack(anchor="w")
+            tk.Label(card, text=str(value), bg=SURFACE, fg=accent, font=("Segoe UI", 24, "bold")).pack(anchor="w", pady=(2, 0))
+            tk.Label(card, text=note, bg=SURFACE, fg=MUTED, font=("Segoe UI", 9)).pack(anchor="w", pady=(2, 0))
             return card
 
         summary_card(card_row, "My Events", len(registered_events), "Registered activities", ACCENT)
@@ -202,8 +213,7 @@ class StudentDashboard(tk.Frame):
         right.pack(side="left", fill="y")
         right.pack_propagate(False)
 
-        quick = tk.Frame(left, bg=SURFACE, padx=16, pady=16,
-                         highlightthickness=1, highlightbackground=BORDER)
+        quick = make_card(left, bg=SURFACE, padx=16, pady=16)
         quick.pack(fill="x", pady=(0, 12))
         make_label(quick, "Quick Actions", font=FONT_HEAD, bg=SURFACE).pack(anchor="w")
         make_label(quick, f"Next event: {next_event_text}", fg=MUTED, bg=SURFACE).pack(anchor="w", pady=(2, 10))
@@ -215,8 +225,7 @@ class StudentDashboard(tk.Frame):
 
         make_label(left, "Suggested Events", font=FONT_HEAD).pack(anchor="w")
         make_label(left, "Events you have not registered for yet.", fg=MUTED).pack(anchor="w", pady=(0, 8))
-        suggestion_box = tk.Frame(left, bg=SURFACE, padx=16, pady=12,
-                                  highlightthickness=1, highlightbackground=BORDER)
+        suggestion_box = make_card(left, bg=SURFACE, padx=16, pady=12)
         suggestion_box.pack(fill="both", expand=True)
 
         if open_events:
@@ -235,8 +244,7 @@ class StudentDashboard(tk.Frame):
             make_label(suggestion_box, "You are already registered for all available events.",
                        fg=MUTED, bg=SURFACE).pack(anchor="w")
 
-        side_card = tk.Frame(right, bg=SURFACE, padx=14, pady=14,
-                             highlightthickness=1, highlightbackground=BORDER)
+        side_card = make_card(right, bg=SURFACE, padx=14, pady=14)
         side_card.pack(fill="both", expand=True)
         make_label(side_card, "Latest Updates", font=FONT_HEAD, bg=SURFACE).pack(anchor="w")
         notes = notif_svc.get_notifications(self._user.id)[:4]
