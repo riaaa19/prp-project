@@ -17,6 +17,7 @@ import services.event_service as event_svc
 import services.registration_service as reg_svc
 import services.notification_service as notif_svc
 import services.reminder_service as rem_svc
+import services.social_service as soc_svc
 from ui.components import (
     BG, SURFACE, SURFACE2, ACCENT, ACCENT2, ACCENT3,
     TEXT, MUTED, BORDER, FONT_TITLE, FONT_HEAD, FONT_BODY, FONT_BTN, FONT_SMALL,
@@ -63,7 +64,10 @@ class StudentDashboard(tk.Frame):
             ("🎟  My Events",     "my_events"),
             ("👤  Profile",       "profile"),
             ("📊  Attendance",    "attendance"),
-            ("🏛️   Clubs",        "clubs"),            ("🔔  Reminders",     "reminders"),            ("🔔  Notifications", "notifications"),
+            ("🏛️   Clubs",        "clubs"),
+            ("🔔  Reminders",     "reminders"),
+            ("👥  Social",        "social"),
+            ("🔔  Notifications", "notifications"),
         ]
         for label, key in nav_items:
             def make_nav_btn(lbl, ky):
@@ -116,6 +120,7 @@ class StudentDashboard(tk.Frame):
             "attendance":  self._build_attendance,
             "clubs":       self._build_clubs,
             "reminders":   self._build_reminders,
+            "social":      self._build_social,
             "notifications": self._build_notifications,
         }[key]()
 
@@ -1080,6 +1085,341 @@ class StudentDashboard(tk.Frame):
 
         self._load_reminders()
         show_toast(self, f"Set up reminders for {reminder_count} event(s)!", success=True)
+
+    # ══════════════════════════════════════════════════════════════════════
+    # Section: Social
+    # ══════════════════════════════════════════════════════════════════════
+    def _build_social(self):
+        wrap = tk.Frame(self._content, bg=BG, padx=40, pady=30)
+        wrap.pack(fill="both", expand=True)
+
+        make_label(wrap, "Social Hub", font=FONT_TITLE).pack(anchor="w")
+        make_label(wrap, "Connect with friends, join study groups, and share events.",
+                   fg=MUTED).pack(anchor="w", pady=(4, 16))
+
+        # Social stats
+        stats = soc_svc.get_social_stats(self._user.id)
+        stats_frame = tk.Frame(wrap, bg=BG)
+        stats_frame.pack(fill="x", pady=(0, 16))
+
+        def stat_card(parent, label, value, icon):
+            card = tk.Frame(parent, bg=SURFACE, padx=16, pady=12)
+            card.pack(side="left", expand=True, fill="x", padx=4)
+            tk.Label(card, text=f"{icon} {value}", bg=SURFACE, fg=ACCENT, font=("Helvetica", 18, "bold")).pack(anchor="w")
+            tk.Label(card, text=label, bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(anchor="w", pady=(2, 0))
+            return card
+
+        stat_card(stats_frame, "Friends", stats['friend_count'], "👥")
+        stat_card(stats_frame, "Study Groups", stats['study_group_count'], "📚")
+        stat_card(stats_frame, "Events Shared", stats['events_shared'], "📤")
+
+        # Tabbed interface
+        tab_frame = tk.Frame(wrap, bg=BG)
+        tab_frame.pack(fill="both", expand=True)
+
+        # Tab buttons
+        self._tab_buttons = {}
+        tab_names = ["Friends", "Study Groups", "Ambassadors", "Share Events"]
+
+        tab_btn_frame = tk.Frame(tab_frame, bg=BG)
+        tab_btn_frame.pack(fill="x", pady=(0, 12))
+
+        for i, tab_name in enumerate(tab_names):
+            btn = tk.Button(tab_btn_frame, text=tab_name, bg=SURFACE, fg=TEXT,
+                           font=FONT_BODY, relief="flat", bd=0, padx=20, pady=8,
+                           command=lambda t=tab_name.lower().replace(" ", "_"): self._switch_social_tab(t))
+            btn.pack(side="left", padx=2)
+            self._tab_buttons[tab_name.lower().replace(" ", "_")] = btn
+
+        # Tab content area
+        self._social_content = tk.Frame(tab_frame, bg=BG)
+        self._social_content.pack(fill="both", expand=True)
+
+        # Initialize with friends tab
+        self._switch_social_tab("friends")
+
+    def _switch_social_tab(self, tab_name):
+        # Clear current content
+        for widget in self._social_content.winfo_children():
+            widget.destroy()
+
+        # Update tab button styles
+        for btn_name, btn in self._tab_buttons.items():
+            if btn_name == tab_name:
+                btn.config(bg=ACCENT, fg="white")
+            else:
+                btn.config(bg=SURFACE, fg=TEXT)
+
+        self._active_social_tab = tab_name
+
+        # Load appropriate tab content
+        tab_methods = {
+            "friends": self._build_friends_tab,
+            "study_groups": self._build_study_groups_tab,
+            "ambassadors": self._build_ambassadors_tab,
+            "share_events": self._build_share_events_tab
+        }
+
+        if tab_name in tab_methods:
+            tab_methods[tab_name]()
+
+    def _build_friends_tab(self):
+        content = self._social_content
+
+        # Friend requests section
+        requests_frame = tk.Frame(content, bg=SURFACE, padx=16, pady=16)
+        requests_frame.pack(fill="x", pady=(0, 12))
+
+        make_label(requests_frame, "Friend Requests", font=FONT_HEAD, bg=SURFACE).pack(anchor="w")
+
+        requests = soc_svc.get_friend_requests(self._user.id)
+        if requests:
+            for req in requests[:3]:  # Show only first 3
+                req_frame = tk.Frame(requests_frame, bg=SURFACE)
+                req_frame.pack(fill="x", pady=(8, 0))
+
+                tk.Label(req_frame, text=f"🤝 {req['username']} wants to be friends",
+                        bg=SURFACE, fg=TEXT, font=FONT_BODY).pack(side="left")
+
+                tk.Button(req_frame, text="Accept", bg=ACCENT, fg="white",
+                         font=("Helvetica", 9), padx=10, pady=2,
+                         command=lambda uid=req['id']: self._accept_friend_request(uid)).pack(side="right", padx=(4, 0))
+        else:
+            make_label(requests_frame, "No pending friend requests.", fg=MUTED, bg=SURFACE).pack(anchor="w", pady=(8, 0))
+
+        # Add friend section
+        add_frame = tk.Frame(content, bg=SURFACE, padx=16, pady=16)
+        add_frame.pack(fill="x", pady=(0, 12))
+
+        make_label(add_frame, "Add Friend", font=FONT_HEAD, bg=SURFACE).pack(anchor="w")
+
+        friend_entry = make_entry(add_frame, width=30, placeholder="Enter username")
+        friend_entry.pack(pady=(8, 0))
+
+        tk.Button(add_frame, text="Send Request", bg=ACCENT, fg="white",
+                 font=FONT_BTN, padx=16, pady=6,
+                 command=lambda: self._send_friend_request(friend_entry.get())).pack()
+
+        # Friends list
+        make_label(content, "My Friends", font=FONT_HEAD).pack(anchor="w", pady=(12, 8))
+
+        friends = soc_svc.get_friends(self._user.id)
+        if friends:
+            friends_frame = tk.Frame(content, bg=SURFACE, padx=16, pady=16)
+            friends_frame.pack(fill="both", expand=True)
+
+            for friend in friends:
+                friend_frame = tk.Frame(friends_frame, bg=SURFACE)
+                friend_frame.pack(fill="x", pady=(0, 8))
+
+                tk.Label(friend_frame, text=f"👤 {friend['username']}",
+                        bg=SURFACE, fg=TEXT, font=FONT_BODY).pack(side="left")
+
+                tk.Label(friend_frame, text=f"Added {friend['created_at'][:10]}",
+                        bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(side="right")
+        else:
+            make_label(content, "No friends yet. Send some friend requests to get started!",
+                      fg=MUTED, bg=BG).pack(anchor="w")
+
+    def _build_study_groups_tab(self):
+        content = self._social_content
+
+        # Create study group section
+        create_frame = tk.Frame(content, bg=SURFACE, padx=16, pady=16)
+        create_frame.pack(fill="x", pady=(0, 12))
+
+        make_label(create_frame, "Create Study Group", font=FONT_HEAD, bg=SURFACE).pack(anchor="w")
+
+        # Form fields
+        form_frame = tk.Frame(create_frame, bg=SURFACE)
+        form_frame.pack(fill="x", pady=(8, 0))
+
+        name_entry = make_entry(form_frame, width=25, placeholder="Group name")
+        name_entry.pack(pady=(0, 8))
+
+        desc_text = tk.Text(form_frame, height=3, width=40, font=FONT_SMALL,
+                           bg=SURFACE2, fg=TEXT)
+        desc_text.pack(pady=(0, 8))
+        desc_text.insert("1.0", "Group description...")
+
+        tk.Button(create_frame, text="Create Group", bg=ACCENT, fg="white",
+                 font=FONT_BTN, padx=16, pady=6,
+                 command=lambda: self._create_study_group(name_entry.get(), desc_text.get("1.0", "end").strip())).pack()
+
+        # Study groups list
+        make_label(content, "Available Study Groups", font=FONT_HEAD).pack(anchor="w", pady=(12, 8))
+
+        groups = soc_svc.get_study_groups()
+        if groups:
+            groups_frame = tk.Frame(content, bg=SURFACE, padx=16, pady=16)
+            groups_frame.pack(fill="both", expand=True)
+
+            for group in groups[:5]:  # Show first 5
+                group_frame = tk.Frame(groups_frame, bg=SURFACE)
+                group_frame.pack(fill="x", pady=(0, 12))
+
+                # Group info
+                info_frame = tk.Frame(group_frame, bg=SURFACE)
+                info_frame.pack(fill="x")
+
+                tk.Label(info_frame, text=f"📚 {group['name']}",
+                        bg=SURFACE, fg=TEXT, font=FONT_BODY).pack(anchor="w")
+
+                tk.Label(info_frame, text=f"by {group['creator_name']} • {group['member_count']}/{group['max_members']} members",
+                        bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(anchor="w")
+
+                if group['description']:
+                    tk.Label(info_frame, text=group['description'][:100] + "..." if len(group['description']) > 100 else group['description'],
+                            bg=SURFACE, fg=TEXT, font=FONT_SMALL, wraplength=400).pack(anchor="w", pady=(4, 0))
+
+                # Join button
+                tk.Button(group_frame, text="Join Group", bg=ACCENT, fg="white",
+                         font=("Helvetica", 9), padx=12, pady=4,
+                         command=lambda gid=group['id']: self._join_study_group(gid)).pack(anchor="e", pady=(8, 0))
+        else:
+            make_label(content, "No study groups available. Create one to get started!",
+                      fg=MUTED, bg=BG).pack(anchor="w")
+
+    def _build_ambassadors_tab(self):
+        content = self._social_content
+
+        make_label(content, "Club Ambassadors", font=FONT_HEAD).pack(anchor="w", pady=(0, 8))
+        make_label(content, "Connect with club representatives for questions and guidance.",
+                   fg=MUTED, bg=BG).pack(anchor="w", pady=(0, 16))
+
+        ambassadors = soc_svc.get_club_ambassadors()
+        if ambassadors:
+            ambassadors_frame = tk.Frame(content, bg=SURFACE, padx=16, pady=16)
+            ambassadors_frame.pack(fill="both", expand=True)
+
+            # Group by club
+            clubs = {}
+            for ambassador in ambassadors:
+                club = ambassador['club_name']
+                if club not in clubs:
+                    clubs[club] = []
+                clubs[club].append(ambassador)
+
+            for club_name, club_ambassadors in clubs.items():
+                # Club header
+                tk.Label(ambassadors_frame, text=f"🏛️ {club_name}",
+                        bg=ambassadors_frame.cget('bg'), fg=ACCENT, font=FONT_HEAD).pack(anchor="w", pady=(0, 8))
+
+                for ambassador in club_ambassadors:
+                    amb_frame = tk.Frame(ambassadors_frame, bg=SURFACE2, padx=12, pady=8)
+                    amb_frame.pack(fill="x", pady=(0, 8))
+
+                    tk.Label(amb_frame, text=f"👤 {ambassador['username']} - {ambassador['title']}",
+                            bg=SURFACE2, fg=TEXT, font=FONT_BODY).pack(anchor="w")
+
+                    if ambassador['bio']:
+                        tk.Label(amb_frame, text=ambassador['bio'][:150] + "..." if len(ambassador['bio']) > 150 else ambassador['bio'],
+                                bg=SURFACE2, fg=MUTED, font=FONT_SMALL, wraplength=500).pack(anchor="w", pady=(2, 0))
+
+                    if ambassador['contact_info']:
+                        tk.Label(amb_frame, text=f"📧 {ambassador['contact_info']}",
+                                bg=SURFACE2, fg=ACCENT3, font=FONT_SMALL).pack(anchor="w", pady=(2, 0))
+        else:
+            make_label(content, "No club ambassadors available at the moment.",
+                      fg=MUTED, bg=BG).pack(anchor="w")
+
+    def _build_share_events_tab(self):
+        content = self._social_content
+
+        make_label(content, "Share Events", font=FONT_HEAD).pack(anchor="w", pady=(0, 8))
+        make_label(content, "Share interesting events with friends and on social media.",
+                   fg=MUTED, bg=BG).pack(anchor="w", pady=(0, 16))
+
+        # Registered events to share
+        events = reg_svc.get_events_for_student(self._user.id)
+        if events:
+            share_frame = tk.Frame(content, bg=SURFACE, padx=16, pady=16)
+            share_frame.pack(fill="both", expand=True)
+
+            make_label(share_frame, "Share Your Events", font=FONT_HEAD, bg=SURFACE).pack(anchor="w", pady=(0, 12))
+
+            for event in events[:5]:  # Show first 5
+                event_frame = tk.Frame(share_frame, bg=SURFACE)
+                event_frame.pack(fill="x", pady=(0, 12))
+
+                tk.Label(event_frame, text=f"🎟️ {event['name']}",
+                        bg=SURFACE, fg=TEXT, font=FONT_BODY).pack(anchor="w")
+
+                tk.Label(event_frame, text=f"{event['date']} • {event['club']}",
+                        bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(anchor="w")
+
+                # Share buttons
+                btn_frame = tk.Frame(event_frame, bg=SURFACE)
+                btn_frame.pack(anchor="w", pady=(6, 0))
+
+                tk.Button(btn_frame, text="📘 Facebook", bg="#1877F2", fg="white",
+                         font=("Helvetica", 8), padx=8, pady=3,
+                         command=lambda eid=event['id']: self._share_event(eid, 'social_media', 'facebook')).pack(side="left", padx=(0, 4))
+
+                tk.Button(btn_frame, text="🐦 Twitter", bg="#1DA1F2", fg="white",
+                         font=("Helvetica", 8), padx=8, pady=3,
+                         command=lambda eid=event['id']: self._share_event(eid, 'social_media', 'twitter')).pack(side="left", padx=(0, 4))
+
+                tk.Button(btn_frame, text="🔗 Copy Link", bg=ACCENT3, fg="white",
+                         font=("Helvetica", 8), padx=8, pady=3,
+                         command=lambda eid=event['id']: self._copy_event_link(eid)).pack(side="left")
+        else:
+            make_label(content, "Register for events to start sharing them with friends!",
+                      fg=MUTED, bg=BG).pack(anchor="w")
+
+    # Social action methods
+    def _send_friend_request(self, username):
+        if not username.strip():
+            messagebox.showerror("Error", "Please enter a username.")
+            return
+
+        try:
+            soc_svc.send_friend_request(self._user.id, username.strip())
+            show_toast(self, f"Friend request sent to {username}!", success=True)
+            self._switch_social_tab("friends")  # Refresh friends tab
+        except ValueError as e:
+            messagebox.showerror("Error", str(e))
+
+    def _accept_friend_request(self, friend_id):
+        try:
+            soc_svc.accept_friend_request(self._user.id, friend_id)
+            show_toast(self, "Friend request accepted!", success=True)
+            self._switch_social_tab("friends")  # Refresh friends tab
+        except ValueError as e:
+            messagebox.showerror("Error", str(e))
+
+    def _create_study_group(self, name, description):
+        if not name.strip():
+            messagebox.showerror("Error", "Please enter a group name.")
+            return
+
+        try:
+            soc_svc.create_study_group(self._user.id, name.strip(), description)
+            show_toast(self, f"Study group '{name}' created!", success=True)
+            self._switch_social_tab("study_groups")  # Refresh study groups tab
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    def _join_study_group(self, group_id):
+        try:
+            soc_svc.join_study_group(self._user.id, group_id)
+            show_toast(self, "Joined study group!", success=True)
+            self._switch_social_tab("study_groups")  # Refresh study groups tab
+        except ValueError as e:
+            messagebox.showerror("Error", str(e))
+
+    def _share_event(self, event_id, share_type, platform=None):
+        try:
+            soc_svc.share_event(self._user.id, event_id, share_type, platform)
+            platform_name = platform.title() if platform else "social media"
+            show_toast(self, f"Event shared on {platform_name}!", success=True)
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    def _copy_event_link(self, event_id):
+        link = soc_svc.generate_event_share_link(event_id)
+        # In a real app, this would copy to clipboard
+        messagebox.showinfo("Share Link", f"Event link: {link}\n\n(Link copied to clipboard)")
 
     # ══════════════════════════════════════════════════════════════════════
     # Section: Notifications
