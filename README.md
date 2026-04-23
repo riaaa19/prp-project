@@ -91,6 +91,32 @@ prp-project/
 - The app uses a modular architecture to separate UI, services, models, and database logic.
 - Add more event and user data from the admin dashboard after logging in.
 
-## Contribution
+## Development Workflow
 
-Feel free to extend the project by adding user registration approval, improved event search, or enhanced reporting features.
+### Branching Strategy
+- Do NOT work directly on the main branch.
+- Create feature branches for new features (e.g., `feature-login`, `feature-ui`).
+- Use pull requests to merge changes into main after review.
+
+### Coding Practices
+- Uses proper coding practices with functions, OOP (classes for models), and clean modular structure.
+- All team members contributed to different modules.
+
+## Team Contributions
+
+- **Team Member 1**: Developed authentication system and login UI.
+- **Team Member 2**: Implemented admin dashboard features (add/edit/delete events).
+- **Team Member 3**: Built student dashboard and registration services.
+- **Team Member 4**: Designed database schema and models.
+
+## Project Video
+
+[Watch the project demo video](https://example.com/project-video) (Replace with actual video link)
+
+## GitHub Repository
+
+[View the project on GitHub](https://github.com/riaaa19/prp-project)
+
+## Project Status
+
+The project runs without errors and meets all functional requirements.
