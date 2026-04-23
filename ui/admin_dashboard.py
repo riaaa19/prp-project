@@ -648,8 +648,23 @@ class AdminDashboard(tk.Frame):
             font=FONT_BODY,
             width=10,
         )
-        self._ev_time_filter.pack(side="left", padx=(8, 0))
+        self._ev_time_filter.pack(side="left", padx=(8, 14))
         self._ev_time_filter.bind("<<ComboboxSelected>>", self._apply_event_filters)
+
+        tk.Label(filter_row, text="Sort", bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(side="left")
+        self._ev_sort_var = tk.StringVar(value="Date (Newest)")
+        self._ev_sort = ttk.Combobox(
+            filter_row,
+            textvariable=self._ev_sort_var,
+            values=["Date (Newest)", "Date (Oldest)", "Name (A-Z)", "Name (Z-A)"],
+            state="readonly",
+            font=FONT_BODY,
+            width=14,
+        )
+        self._ev_sort.pack(side="left", padx=(8, 14))
+        self._ev_sort.bind("<<ComboboxSelected>>", self._apply_event_filters)
+
+        make_button(filter_row, "Reset", self._reset_event_filters, color=SURFACE2, width=8).pack(side="right")
 
         table_card = tk.Frame(wrap, bg=SURFACE, padx=12, pady=12,
                               highlightthickness=1, highlightbackground=BORDER)
@@ -703,6 +718,7 @@ class AdminDashboard(tk.Frame):
         search_text = self._ev_search_entry.get().strip().lower()
         club_filter = self._ev_club_filter_var.get().strip()
         time_filter = self._ev_time_filter_var.get().strip()
+        sort_choice = self._ev_sort_var.get().strip()
         today = date.today()
 
         filtered = []
@@ -729,11 +745,27 @@ class AdminDashboard(tk.Frame):
 
             filtered.append(ev)
 
+        if sort_choice == "Date (Oldest)":
+            filtered.sort(key=lambda ev: ev.date)
+        elif sort_choice == "Name (A-Z)":
+            filtered.sort(key=lambda ev: ev.name.lower())
+        elif sort_choice == "Name (Z-A)":
+            filtered.sort(key=lambda ev: ev.name.lower(), reverse=True)
+        else:
+            filtered.sort(key=lambda ev: ev.date, reverse=True)
+
         return filtered
 
     def _apply_event_filters(self, _event=None):
         filtered = self._get_manage_events_filtered()
         self._load_events_with_list(filtered)
+
+    def _reset_event_filters(self):
+        self._ev_search_entry.delete(0, "end")
+        self._ev_club_filter_var.set("All Clubs")
+        self._ev_time_filter_var.set("All")
+        self._ev_sort_var.set("Date (Newest)")
+        self._apply_event_filters()
 
     def _refresh_events(self):
         self._refresh_event_filter_options()
