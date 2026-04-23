@@ -626,6 +626,31 @@ class AdminDashboard(tk.Frame):
         self._ev_search_entry.pack(side="left", padx=(8, 14))
         self._ev_search_entry.bind("<KeyRelease>", self._apply_event_filters)
 
+        tk.Label(filter_row, text="Club", bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(side="left")
+        self._ev_club_filter_var = tk.StringVar(value="All Clubs")
+        self._ev_club_filter = ttk.Combobox(
+            filter_row,
+            textvariable=self._ev_club_filter_var,
+            state="readonly",
+            font=FONT_BODY,
+            width=16,
+        )
+        self._ev_club_filter.pack(side="left", padx=(8, 14))
+        self._ev_club_filter.bind("<<ComboboxSelected>>", self._apply_event_filters)
+
+        tk.Label(filter_row, text="Time", bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(side="left")
+        self._ev_time_filter_var = tk.StringVar(value="All")
+        self._ev_time_filter = ttk.Combobox(
+            filter_row,
+            textvariable=self._ev_time_filter_var,
+            values=["All", "Upcoming", "Today", "Past"],
+            state="readonly",
+            font=FONT_BODY,
+            width=10,
+        )
+        self._ev_time_filter.pack(side="left", padx=(8, 0))
+        self._ev_time_filter.bind("<<ComboboxSelected>>", self._apply_event_filters)
+
         table_card = tk.Frame(wrap, bg=SURFACE, padx=12, pady=12,
                               highlightthickness=1, highlightbackground=BORDER)
         table_card.pack(fill="both", expand=True)
@@ -642,6 +667,7 @@ class AdminDashboard(tk.Frame):
         self._ev_tree.column("Club", width=180, anchor="w")
 
         self._load_events()
+        self._refresh_event_filter_options()
         self._apply_event_filters()
 
         # action buttons
@@ -665,15 +691,42 @@ class AdminDashboard(tk.Frame):
             self._ev_tree.insert("", "end", iid=ev.id,
                                  values=(ev.id, ev.name, ev.date, ev.club))
 
+    def _refresh_event_filter_options(self):
+        clubs = sorted({ev.club for ev in event_svc.get_all_events() if ev.club})
+        values = ["All Clubs", *clubs]
+        self._ev_club_filter["values"] = values
+        if self._ev_club_filter_var.get() not in values:
+            self._ev_club_filter_var.set("All Clubs")
+
     def _get_manage_events_filtered(self):
         events = event_svc.get_all_events()
         search_text = self._ev_search_entry.get().strip().lower()
+        club_filter = self._ev_club_filter_var.get().strip()
+        time_filter = self._ev_time_filter_var.get().strip()
+        today = date.today()
 
         filtered = []
         for ev in events:
             haystack = f"{ev.name} {ev.date} {ev.club}".lower()
             if search_text and search_text not in haystack:
                 continue
+
+            if club_filter and club_filter != "All Clubs" and ev.club != club_filter:
+                continue
+
+            ev_day = None
+            try:
+                ev_day = datetime.strptime(ev.date, "%Y-%m-%d").date()
+            except ValueError:
+                pass
+
+            if time_filter == "Upcoming" and (ev_day is None or ev_day < today):
+                continue
+            if time_filter == "Today" and ev_day != today:
+                continue
+            if time_filter == "Past" and (ev_day is None or ev_day >= today):
+                continue
+
             filtered.append(ev)
 
         return filtered
@@ -683,6 +736,7 @@ class AdminDashboard(tk.Frame):
         self._load_events_with_list(filtered)
 
     def _refresh_events(self):
+        self._refresh_event_filter_options()
         self._apply_event_filters()
         show_toast(self, "Events refreshed.", success=True)
 
