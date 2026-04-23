@@ -8,6 +8,8 @@ Three sections reachable via the sidebar:
 
 Everything is wired up — no dead buttons.
 """
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
 import csv
@@ -26,7 +28,23 @@ from ui.components import (
     apply_global_style,
 )
 
+def fade_in(widget, step=0):
+    try:
+        if step > 1:
+            return
+        widget.attributes("-alpha", step)
+        widget.after(20, lambda: fade_in(widget, step + 0.08))
+    except:
+        pass
 
+
+def add_hover_effect(btn, normal, hover):
+    def on_enter(e):
+        btn.config(bg=hover)
+    def on_leave(e):
+        btn.config(bg=normal)
+    btn.bind("<Enter>", on_enter)
+    btn.bind("<Leave>", on_leave)
 class AdminDashboard(tk.Frame):
     def __init__(self, parent, user, on_logout):
         super().__init__(parent, bg=BG)
@@ -105,159 +123,87 @@ class AdminDashboard(tk.Frame):
     # Navigation
     # ══════════════════════════════════════════════════════════════════════
     def _show_section(self, key: str):
-        # update sidebar highlight with premium active state
-        for k, btn in self._nav_btns.items():
-            if k == key:
-                btn.config(bg=ACCENT, fg="white", relief="flat")
-            else:
-                btn.config(bg=SURFACE, fg=TEXT, relief="flat")
-        self._active_section = key
+    for k, btn in self._nav_btns.items():
+        if k == key:
+            btn.config(bg=ACCENT, fg="white")
+        else:
+            btn.config(bg=SURFACE, fg=TEXT)
 
-        # clear content
-        for widget in self._content.winfo_children():
-            widget.destroy()
+    self._active_section = key
 
-        # render section
-        builders = {
-            "dashboard":          self._build_dashboard,
-            "manage_events":      self._build_manage_events,
-            "add_event":          self._build_add_event,
-            "registrations":      self._build_view_registrations,
-            "announcements":      self._build_announcements,
-            "reports":            self._build_reports,
-            "members":            self._build_members,
-            "clubs":              self._build_clubs,
-            "attendance":         self._build_attendance,
-            "event_calendar":     self._build_event_calendar,
-        }
-        builders[key]()
+    for widget in self._content.winfo_children():
+        widget.destroy()
+
+    # animation
+    try:
+        self._content.attributes("-alpha", 0)
+        fade_in(self._content)
+    except:
+        pass
+
+    builders = {
+        "dashboard": self._build_dashboard,
+        "manage_events": self._build_manage_events,
+        "add_event": self._build_add_event,
+        "registrations": self._build_view_registrations,
+        "announcements": self._build_announcements,
+        "reports": self._build_reports,
+        "members": self._build_members,
+        "clubs": self._build_clubs,
+        "attendance": self._build_attendance,
+        "event_calendar": self._build_event_calendar,
+    }
+    builders[key]()
 
     # ══════════════════════════════════════════════════════════════════════
     # Section: Dashboard
     # ══════════════════════════════════════════════════════════════════════
     def _build_dashboard(self):
-        wrap = tk.Frame(self._content, bg=BG, padx=24, pady=20)
-        wrap.pack(fill="both", expand=True)
+    wrap = tk.Frame(self._content, bg=BG, padx=24, pady=20)
+    wrap.pack(fill="both", expand=True)
 
-        make_label(wrap, "Dashboard", font=FONT_TITLE).pack(anchor="w")
-        make_label(wrap, "Welcome to College CMS Admin", fg=MUTED).pack(anchor="w", pady=(2, 10))
+    make_label(wrap, "Dashboard", font=FONT_TITLE).pack(anchor="w")
 
-        card_row = tk.Frame(wrap, bg=BG)
-        card_row.pack(fill="x", pady=(10, 18))
+    events = event_svc.get_all_events()
+    registrations = reg_svc.get_all_registrations()
 
-        def card(parent, title, value, subtitle, accent):
-            frame = make_card(parent, bg=SURFACE, padx=16, pady=18)
-            frame.pack(side="left", expand=True, fill="x", padx=6)
-            tk.Label(frame, text=title, bg=SURFACE, fg=MUTED, font=("Segoe UI", 9)).pack(anchor="w", pady=(0, 6))
-            tk.Label(frame, text=value, bg=SURFACE, fg=accent, font=("Segoe UI", 24, "bold")).pack(anchor="w", pady=(0, 6))
-            tk.Label(frame, text=subtitle, bg=SURFACE, fg=MUTED, font=("Segoe UI", 9)).pack(anchor="w")
-            return frame
+    total_events = len(events)
+    total_members = user_svc.get_total_members()
+    total_clubs = event_svc.get_club_count()
 
-        events = event_svc.get_all_events()
-        registrations = reg_svc.get_all_registrations()
-        attendance_rows = att_svc.get_all_attendance()
-        total_events = len(events)
-        total_members = user_svc.get_total_members()
-        total_clubs = event_svc.get_club_count()
-        unmarked_count = len([row for row in attendance_rows if row["status"] == "unmarked"])
+    # cards
+    row = tk.Frame(wrap, bg=BG)
+    row.pack(fill="x", pady=15)
 
-        card(card_row, "Total Events", str(total_events), "All scheduled activities", ACCENT)
-        card(card_row, "Members", str(total_members), "Registered student accounts", ACCENT3)
-        card(card_row, "Clubs", str(total_clubs), "Active student clubs", ACCENT2)
-        card(card_row, "Registrations", str(len(registrations)), f"{unmarked_count} attendance marks pending", ACCENT)
+    def card(title, value):
+        c = tk.Frame(row, bg=SURFACE, padx=16, pady=16,
+                     highlightthickness=1, highlightbackground=BORDER)
+        c.pack(side="left", expand=True, fill="x", padx=6)
+        tk.Label(c, text=title, bg=SURFACE, fg=MUTED).pack(anchor="w")
+        tk.Label(c, text=value, bg=SURFACE, fg=ACCENT,
+                 font=("Segoe UI", 22, "bold")).pack(anchor="w")
 
-        lower = tk.Frame(wrap, bg=BG)
-        lower.pack(fill="both", expand=True)
+    card("Events", total_events)
+    card("Members", total_members)
+    card("Clubs", total_clubs)
+    card("Registrations", len(registrations))
 
-        left = tk.Frame(lower, bg=BG)
-        left.pack(side="left", fill="both", expand=True, padx=(0, 10))
-        right = tk.Frame(lower, bg=BG, width=300)
-        right.pack(side="left", fill="y")
-        right.pack_propagate(False)
+    # chart
+    chart_frame = tk.Frame(wrap, bg=SURFACE)
+    chart_frame.pack(fill="both", expand=True, pady=10)
 
-        make_label(left, "Recent Events", font=FONT_HEAD).pack(anchor="w")
-        make_label(left, "Overview of your latest events", fg=MUTED).pack(anchor="w", pady=(0, 10))
-        cols = ("Event Name", "Date", "Club", "Status")
-        tv_frame, tv = make_treeview(left, cols)
-        tv_frame.pack(fill="both", expand=True)
+    fig, ax = plt.subplots(figsize=(5, 2.5))
+    ax.bar(["Events", "Members", "Clubs"],
+           [total_events, total_members, total_clubs])
+    ax.set_title("System Overview")
 
-        today_iso = date.today().isoformat()
-        for ev in events[:5]:
-            status = "upcoming" if ev.date >= today_iso else "completed"
-            tv.insert("", "end", values=(ev.name, ev.date, ev.club, status))
+    canvas = FigureCanvasTkAgg(fig, master=chart_frame)
+    canvas.draw()
+    canvas.get_tk_widget().pack(fill="both", expand=True)
 
-        make_button(left, "+ Add Event", lambda: self._show_section("add_event"), color=ACCENT, width=12).pack(anchor="e", pady=(8, 0))
-
-        action_card = make_card(right, bg=SURFACE, padx=14, pady=14)
-        action_card.pack(fill="x", pady=(0, 12))
-        make_label(action_card, "Quick Actions", font=FONT_HEAD, bg=SURFACE).pack(anchor="w")
-        make_label(action_card, "Open the most-used admin tools", fg=MUTED, bg=SURFACE).pack(anchor="w", pady=(0, 10))
-
-        action_grid = tk.Frame(action_card, bg=SURFACE)
-        action_grid.pack(fill="x")
-        action_grid.columnconfigure(0, weight=1)
-        action_grid.columnconfigure(1, weight=1)
-        make_button(action_grid, "Add Event", lambda: self._show_section("add_event"), color=ACCENT, width=12).grid(row=0, column=0, padx=(0, 8), pady=(0, 8), sticky="ew")
-        make_button(action_grid, "Registrations", lambda: self._show_section("registrations"), color=ACCENT3, width=12).grid(row=0, column=1, pady=(0, 8), sticky="ew")
-        make_button(action_grid, "Announcements", lambda: self._show_section("announcements"), color=ACCENT, width=12).grid(row=1, column=0, padx=(0, 8), pady=(0, 8), sticky="ew")
-        make_button(action_grid, "Reports", lambda: self._show_section("reports"), color=ACCENT3, width=12).grid(row=1, column=1, pady=(0, 8), sticky="ew")
-        make_button(action_grid, "Attendance", lambda: self._show_section("attendance"), color=SURFACE2, width=12).grid(row=2, column=0, padx=(0, 8), sticky="ew")
-        make_button(action_grid, "Calendar", lambda: self._show_section("event_calendar"), color=SURFACE2, width=12).grid(row=2, column=1, sticky="ew")
-
-        insight_card = make_card(right, bg=SURFACE, padx=14, pady=14)
-        insight_card.pack(fill="both", expand=True)
-        make_label(insight_card, "Event Highlights", font=FONT_HEAD, bg=SURFACE).pack(anchor="w")
-        make_label(insight_card, "Upcoming activity and club momentum", fg=MUTED, bg=SURFACE).pack(anchor="w", pady=(0, 10))
-
-        summary_map = {
-            row["event_name"]: row["total_registered"]
-            for row in reg_svc.get_registration_summary()
-        }
-        upcoming_events = []
-        today = date.today()
-        for ev in events:
-            try:
-                event_day = datetime.strptime(ev.date, "%Y-%m-%d").date()
-            except ValueError:
-                continue
-            if event_day >= today:
-                upcoming_events.append((event_day, ev))
-        upcoming_events.sort(key=lambda item: item[0])
-
-        if upcoming_events:
-            for event_day, ev in upcoming_events[:3]:
-                days_left = (event_day - today).days
-                when_text = "Today" if days_left == 0 else "Tomorrow" if days_left == 1 else f"In {days_left} days"
-                tk.Label(
-                    insight_card,
-                    text=f"• {ev.name}\n  {ev.date} • {ev.club}\n  {summary_map.get(ev.name, 0)} registration(s) • {when_text}",
-                    bg=SURFACE,
-                    fg=TEXT,
-                    font=FONT_SMALL,
-                    justify="left",
-                    anchor="w",
-                    wraplength=250,
-                ).pack(anchor="w", fill="x", pady=(0, 8))
-        else:
-            make_label(insight_card, "No upcoming events yet. Add one to get started.",
-                       fg=MUTED, bg=SURFACE).pack(anchor="w")
-
-        tk.Frame(insight_card, bg=BORDER, height=1).pack(fill="x", pady=8)
-        make_label(insight_card, "Top Clubs", font=FONT_SMALL, fg=ACCENT, bg=SURFACE).pack(anchor="w", pady=(0, 6))
-        club_summary = event_svc.get_club_summary()[:3]
-        if club_summary:
-            for club in club_summary:
-                make_label(
-                    insight_card,
-                    f"{club['club']} • {club['event_count']} event(s)",
-                    fg=TEXT,
-                    bg=SURFACE,
-                    font=FONT_SMALL,
-                ).pack(anchor="w", pady=(0, 4))
-        else:
-            make_label(insight_card, "Club activity will appear here once events are added.",
-                       fg=MUTED, bg=SURFACE, font=FONT_SMALL).pack(anchor="w")
-
+    # insight
+    insight = "High activity 🚀" if total_events > 5 else "Getting started 📊"
+    make_label(wrap, f"Insight: {insight}", fg=ACCENT).pack(anchor="w", pady=10)
     # ══════════════════════════════════════════════════════════════════════
     # Section: Members
     # ══════════════════════════════════════════════════════════════════════
@@ -581,119 +527,41 @@ class AdminDashboard(tk.Frame):
     # Section: Manage Events
     # ══════════════════════════════════════════════════════════════════════
     def _build_manage_events(self):
-        wrap = tk.Frame(self._content, bg=BG, padx=24, pady=20)
-        wrap.pack(fill="both", expand=True)
+    wrap = tk.Frame(self._content, bg=BG, padx=40, pady=30)
+    wrap.pack(fill="both", expand=True)
 
-        make_label(wrap, "Manage Events", font=FONT_TITLE).pack(anchor="w")
-        make_label(wrap, "Select a row to edit or delete an event.",
-                   fg=MUTED).pack(anchor="w", pady=(2, 12))
+    make_label(wrap, "Manage Events", font=FONT_TITLE).pack(anchor="w")
 
-        events = event_svc.get_all_events()
-        summary_row = tk.Frame(wrap, bg=BG)
-        summary_row.pack(fill="x", pady=(0, 10))
+    # search
+    search = make_entry(wrap)
+    search.pack(fill="x", pady=10)
 
-        def ev_stat(parent, title, value, accent):
-            card = tk.Frame(parent, bg=SURFACE, padx=14, pady=12,
-                            highlightthickness=1, highlightbackground=BORDER)
-            card.pack(side="left", fill="x", expand=True, padx=(0, 8))
-            tk.Label(card, text=title, bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(anchor="w")
-            tk.Label(card, text=value, bg=SURFACE, fg=accent, font=("Segoe UI", 16, "bold")).pack(anchor="w", pady=(4, 0))
+    cols = ("ID", "Name", "Date", "Club")
+    tv_frame, self._ev_tree = make_treeview(wrap, cols)
+    tv_frame.pack(fill="both", expand=True)
 
-        upcoming_count = 0
-        today = date.today().isoformat()
-        for ev in events:
-            if ev.date >= today:
-                upcoming_count += 1
-        ev_stat(summary_row, "Total Events", str(len(events)), ACCENT)
-        ev_stat(summary_row, "Upcoming", str(upcoming_count), ACCENT3)
+    events = event_svc.get_all_events()
 
-        action_row = tk.Frame(wrap, bg=BG)
-        action_row.pack(fill="x", pady=(0, 8))
-        make_button(action_row, "➕  Add Event", lambda: self._show_section("add_event"),
-                    color=ACCENT, width=12).pack(side="left")
-        make_button(action_row, "🔄  Refresh", self._refresh_events,
-                    color=SURFACE2, width=12).pack(side="right")
+    def load(data):
+        self._ev_tree.delete(*self._ev_tree.get_children())
+        for ev in data:
+            self._ev_tree.insert("", "end",
+                                 values=(ev.id, ev.name, ev.date, ev.club))
 
-        filter_card = tk.Frame(wrap, bg=SURFACE, padx=12, pady=10,
-                               highlightthickness=1, highlightbackground=BORDER)
-        filter_card.pack(fill="x", pady=(0, 8))
+    load(events)
 
-        filter_row = tk.Frame(filter_card, bg=SURFACE)
-        filter_row.pack(fill="x")
+    def filter_data(e=None):
+        q = search.get().lower()
+        filtered = [ev for ev in events if q in ev.name.lower()]
+        load(filtered)
 
-        tk.Label(filter_row, text="Search", bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(side="left")
-        self._ev_search_entry = make_entry(filter_row, width=24)
-        self._ev_search_entry.pack(side="left", padx=(8, 14))
-        self._ev_search_entry.bind("<KeyRelease>", self._apply_event_filters)
+    search.bind("<KeyRelease>", filter_data)
 
-        tk.Label(filter_row, text="Club", bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(side="left")
-        self._ev_club_filter_var = tk.StringVar(value="All Clubs")
-        self._ev_club_filter = ttk.Combobox(
-            filter_row,
-            textvariable=self._ev_club_filter_var,
-            state="readonly",
-            font=FONT_BODY,
-            width=16,
-        )
-        self._ev_club_filter.pack(side="left", padx=(8, 14))
-        self._ev_club_filter.bind("<<ComboboxSelected>>", self._apply_event_filters)
+    btn_row = tk.Frame(wrap, bg=BG)
+    btn_row.pack(fill="x", pady=10)
 
-        tk.Label(filter_row, text="Time", bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(side="left")
-        self._ev_time_filter_var = tk.StringVar(value="All")
-        self._ev_time_filter = ttk.Combobox(
-            filter_row,
-            textvariable=self._ev_time_filter_var,
-            values=["All", "Upcoming", "Today", "Past"],
-            state="readonly",
-            font=FONT_BODY,
-            width=10,
-        )
-        self._ev_time_filter.pack(side="left", padx=(8, 14))
-        self._ev_time_filter.bind("<<ComboboxSelected>>", self._apply_event_filters)
-
-        tk.Label(filter_row, text="Sort", bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(side="left")
-        self._ev_sort_var = tk.StringVar(value="Date (Newest)")
-        self._ev_sort = ttk.Combobox(
-            filter_row,
-            textvariable=self._ev_sort_var,
-            values=["Date (Newest)", "Date (Oldest)", "Name (A-Z)", "Name (Z-A)"],
-            state="readonly",
-            font=FONT_BODY,
-            width=14,
-        )
-        self._ev_sort.pack(side="left", padx=(8, 14))
-        self._ev_sort.bind("<<ComboboxSelected>>", self._apply_event_filters)
-
-        make_button(filter_row, "Reset", self._reset_event_filters, color=SURFACE2, width=8).pack(side="right")
-
-        table_card = tk.Frame(wrap, bg=SURFACE, padx=12, pady=12,
-                              highlightthickness=1, highlightbackground=BORDER)
-        table_card.pack(fill="both", expand=True)
-        make_label(table_card, "Event List", font=FONT_HEAD, bg=SURFACE).pack(anchor="w")
-        make_label(table_card, "Select any event to edit details or delete it.", fg=MUTED, bg=SURFACE).pack(anchor="w", pady=(2, 8))
-
-        cols = ("ID", "Name", "Date", "Club")
-        tv_frame, self._ev_tree = make_treeview(table_card, cols)
-        tv_frame.pack(fill="both", expand=True)
-        self._ev_tree.configure(height=12)
-        self._ev_tree.column("ID", width=50, anchor="center")
-        self._ev_tree.column("Name", width=280, anchor="w")
-        self._ev_tree.column("Date", width=120, anchor="center")
-        self._ev_tree.column("Club", width=180, anchor="w")
-
-        self._load_events()
-        self._refresh_event_filter_options()
-        self._apply_event_filters()
-
-        # action buttons
-        btn_row = tk.Frame(table_card, bg=SURFACE)
-        btn_row.pack(fill="x", pady=(12, 0))
-
-        make_button(btn_row, "✏️  Edit Selected",   self._edit_event,
-                    color=ACCENT,  width=16).pack(side="right", padx=(8, 0))
-        make_button(btn_row, "🗑  Delete Selected", self._delete_event,
-                    color=ACCENT2, width=16).pack(side="right")
-
+    make_button(btn_row, "Edit", self._edit_event).pack(side="left", padx=5)
+    make_button(btn_row, "Delete", self._delete_event).pack(side="left")
     def _load_events(self):
         self._ev_tree.delete(*self._ev_tree.get_children())
         for ev in event_svc.get_all_events():
