@@ -854,9 +854,16 @@ class AdminDashboard(tk.Frame):
         )
         self._reminder_combo.pack(fill="x", pady=(0, 8))
 
+        btn_row = tk.Frame(reminder_card, bg=SURFACE)
+        btn_row.pack(fill="x", pady=(0, 8))
+        make_button(btn_row, "🔄 Refresh Events", self._load_reminder_events,
+                    color=SURFACE2, width=16).pack(side="left")
+        make_button(btn_row, "⏰ Send Reminder", self._send_event_reminder,
+                    color=ACCENT3, width=16).pack(side="left", padx=(8, 0))
+
         self._reminder_note = tk.Text(
             reminder_card,
-            height=4,
+            height=3,
             bg=SURFACE2,
             fg=TEXT,
             insertbackground=TEXT,
@@ -865,13 +872,6 @@ class AdminDashboard(tk.Frame):
             wrap="word",
         )
         self._reminder_note.pack(fill="x")
-
-        btn_row = tk.Frame(reminder_card, bg=SURFACE)
-        btn_row.pack(fill="x", pady=(10, 0))
-        make_button(btn_row, "🔄 Refresh Events", self._load_reminder_events,
-                    color=SURFACE2, width=16).pack(side="left")
-        make_button(btn_row, "⏰ Send Reminder", self._send_event_reminder,
-                    color=ACCENT3, width=16).pack(side="left", padx=(8, 0))
 
         self._load_reminder_events()
 
