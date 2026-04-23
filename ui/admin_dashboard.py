@@ -611,6 +611,8 @@ class AdminDashboard(tk.Frame):
         action_row.pack(fill="x", pady=(0, 8))
         make_button(action_row, "➕  Add Event", lambda: self._show_section("add_event"),
                     color=ACCENT, width=12).pack(side="left")
+        make_button(action_row, "⬇ Export Filtered", self._export_filtered_events_csv,
+                color=ACCENT3, width=14).pack(side="right", padx=(8, 0))
         make_button(action_row, "🔄  Refresh", self._refresh_events,
                     color=SURFACE2, width=12).pack(side="right")
 
@@ -665,6 +667,10 @@ class AdminDashboard(tk.Frame):
         self._ev_sort.bind("<<ComboboxSelected>>", self._apply_event_filters)
 
         make_button(filter_row, "Reset", self._reset_event_filters, color=SURFACE2, width=8).pack(side="right")
+
+        self._ev_filter_meta_var = tk.StringVar(value="Showing 0 of 0 events")
+        tk.Label(filter_card, textvariable=self._ev_filter_meta_var,
+             bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(anchor="w", pady=(8, 0))
 
         table_card = tk.Frame(wrap, bg=SURFACE, padx=12, pady=12,
                               highlightthickness=1, highlightbackground=BORDER)
@@ -754,11 +760,12 @@ class AdminDashboard(tk.Frame):
         else:
             filtered.sort(key=lambda ev: ev.date, reverse=True)
 
-        return filtered
+        return filtered, len(events)
 
     def _apply_event_filters(self, _event=None):
-        filtered = self._get_manage_events_filtered()
+        filtered, total = self._get_manage_events_filtered()
         self._load_events_with_list(filtered)
+        self._ev_filter_meta_var.set(f"Showing {len(filtered)} of {total} events")
 
     def _reset_event_filters(self):
         self._ev_search_entry.delete(0, "end")
@@ -771,6 +778,25 @@ class AdminDashboard(tk.Frame):
         self._refresh_event_filter_options()
         self._apply_event_filters()
         show_toast(self, "Events refreshed.", success=True)
+
+    def _export_filtered_events_csv(self):
+        filtered, _ = self._get_manage_events_filtered()
+        path = filedialog.asksaveasfilename(
+            title="Export Filtered Events",
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*")],
+        )
+        if not path:
+            return
+        try:
+            with open(path, "w", newline="", encoding="utf-8") as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow(["id", "name", "date", "club"])
+                for ev in filtered:
+                    writer.writerow([ev.id, ev.name, ev.date, ev.club])
+            show_toast(self, f"Exported {len(filtered)} filtered event(s).", success=True)
+        except Exception as exc:
+            messagebox.showerror("Export Filtered Events", str(exc))
 
     def _get_selected_event(self):
         sel = self._ev_tree.selection()
