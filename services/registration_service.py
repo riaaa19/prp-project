@@ -4,6 +4,7 @@ Handles student ↔ event registration logic.
 """
 import sqlite3
 from database.db import get_connection
+import services.gamification_service as gamif_svc
 
 
 def register_student(user_id: int, event_id: int):
@@ -19,6 +20,9 @@ def register_student(user_id: int, event_id: int):
             (user_id, event_id),
         )
         conn.commit()
+
+        # Award points for registration
+        gamif_svc.award_points(user_id, 5, "event_registration", event_id)
 
         # Auto-create reminders for the registered event
         try:

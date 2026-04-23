@@ -18,6 +18,7 @@ import services.registration_service as reg_svc
 import services.notification_service as notif_svc
 import services.reminder_service as rem_svc
 import services.social_service as soc_svc
+import services.gamification_service as gamif_svc
 from ui.components import (
     BG, SURFACE, SURFACE2, ACCENT, ACCENT2, ACCENT3,
     TEXT, MUTED, BORDER, FONT_TITLE, FONT_HEAD, FONT_BODY, FONT_BTN, FONT_SMALL,
@@ -68,6 +69,7 @@ class StudentDashboard(tk.Frame):
             ("🔔  Reminders",     "reminders"),
             ("👥  Social",        "social"),
             ("🔔  Notifications", "notifications"),
+            ("🎮  Gamification",  "gamification"),
         ]
         for label, key in nav_items:
             def make_nav_btn(lbl, ky):
@@ -122,6 +124,7 @@ class StudentDashboard(tk.Frame):
             "reminders":   self._build_reminders,
             "social":      self._build_social,
             "notifications": self._build_notifications,
+            "gamification": self._build_gamification,
         }[key]()
 
     def _safe_parse_date(self, value: str):
@@ -1477,4 +1480,353 @@ class StudentDashboard(tk.Frame):
         notif_svc.mark_all_read(self._user.id)
         self._load_notifications()
         show_toast(self, "All notifications marked as read.", success=True)
+
+    # ══════════════════════════════════════════════════════════════════════
+    # Section: Gamification
+    # ══════════════════════════════════════════════════════════════════════
+    def _build_gamification(self):
+        wrap = tk.Frame(self._content, bg=BG, padx=40, pady=30)
+        wrap.pack(fill="both", expand=True)
+
+        make_label(wrap, "Gamification & Achievements", font=FONT_TITLE).pack(anchor="w")
+        make_label(wrap, "Earn badges, collect points, and track your progress!",
+                   fg=MUTED).pack(anchor="w", pady=(4, 16))
+
+        # Get gamification stats
+        stats = gamif_svc.get_gamification_stats(self._user.id)
+
+        # Overview stats
+        stats_frame = tk.Frame(wrap, bg=BG)
+        stats_frame.pack(fill="x", pady=(0, 16))
+
+        def stat_card(parent, label, value, icon, color=ACCENT):
+            card = tk.Frame(parent, bg=SURFACE, padx=16, pady=12)
+            card.pack(side="left", expand=True, fill="x", padx=4)
+            tk.Label(card, text=f"{icon} {value}", bg=SURFACE, fg=color, font=("Helvetica", 18, "bold")).pack(anchor="w")
+            tk.Label(card, text=label, bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(anchor="w", pady=(2, 0))
+            return card
+
+        stat_card(stats_frame, "Total Points", stats['points']['total_points'], "⭐")
+        stat_card(stats_frame, "Current Level", stats['points']['current_level'], "🏆")
+        stat_card(stats_frame, "Badges Earned", stats['badges']['earned'], "🎖️")
+        stat_card(stats_frame, "Leaderboard Rank", f"#{stats['leaderboard_rank'] or 'N/A'}", "📊")
+
+        # Tabbed interface for gamification features
+        tab_frame = tk.Frame(wrap, bg=BG)
+        tab_frame.pack(fill="both", expand=True)
+
+        # Tab buttons
+        self._gamif_tab_buttons = {}
+        tab_names = ["Achievements", "Points", "Leaderboards", "Progress"]
+
+        tab_btn_frame = tk.Frame(tab_frame, bg=BG)
+        tab_btn_frame.pack(fill="x", pady=(0, 12))
+
+        for i, tab_name in enumerate(tab_names):
+            btn = tk.Button(tab_btn_frame, text=tab_name, bg=SURFACE, fg=TEXT,
+                           font=FONT_BODY, relief="flat", bd=0, width=16,
+                           padx=20, pady=8,
+                           command=lambda t=tab_name.lower(): self._switch_gamif_tab(t))
+            btn.pack(side="left", padx=2)
+            self._gamif_tab_buttons[tab_name.lower()] = btn
+
+        # Tab content area
+        self._gamif_content = tk.Frame(tab_frame, bg=BG)
+        self._gamif_content.pack(fill="both", expand=True)
+
+        # Initialize with achievements tab
+        self._switch_gamif_tab("achievements")
+
+    def _switch_gamif_tab(self, tab_name):
+        # Clear current content
+        for widget in self._gamif_content.winfo_children():
+            widget.destroy()
+
+        # Update tab button styles
+        for btn_name, btn in self._gamif_tab_buttons.items():
+            if btn_name == tab_name:
+                btn.config(bg=ACCENT, fg="white")
+            else:
+                btn.config(bg=SURFACE, fg=TEXT)
+
+        self._active_gamif_tab = tab_name
+
+        # Load appropriate tab content
+        tab_methods = {
+            "achievements": self._build_achievements_tab,
+            "points": self._build_points_tab,
+            "leaderboards": self._build_leaderboards_tab,
+            "progress": self._build_progress_tab
+        }
+
+        if tab_name in tab_methods:
+            tab_methods[tab_name]()
+
+    def _build_achievements_tab(self):
+        content = self._gamif_content
+
+        make_label(content, "Achievement Badges", font=FONT_HEAD).pack(anchor="w", pady=(0, 8))
+        make_label(content, "Earn badges by participating in events and activities.",
+                   fg=MUTED, bg=BG).pack(anchor="w", pady=(0, 16))
+
+        # Earned badges section
+        earned_frame = tk.Frame(content, bg=SURFACE, padx=16, pady=16)
+        earned_frame.pack(fill="x", pady=(0, 12))
+
+        make_label(earned_frame, "Your Badges", font=FONT_HEAD, bg=SURFACE).pack(anchor="w")
+
+        earned_badges = gamif_svc.get_user_achievements(self._user.id)
+        if earned_badges:
+            badges_frame = tk.Frame(earned_frame, bg=SURFACE)
+            badges_frame.pack(fill="x", pady=(8, 0))
+
+            for i, badge in enumerate(earned_badges[:8]):  # Show first 8
+                badge_btn = tk.Button(badges_frame, text=f"{badge['icon']} {badge['name']}",
+                                     bg=SURFACE2, fg=TEXT, font=("Helvetica", 10),
+                                     relief="flat", padx=12, pady=8,
+                                     command=lambda b=badge: self._show_badge_details(b))
+                badge_btn.pack(side="left", padx=4, pady=4)
+        else:
+            make_label(earned_frame, "No badges earned yet. Start participating to earn your first badge!",
+                      fg=MUTED, bg=SURFACE).pack(anchor="w", pady=(8, 0))
+
+        # Available badges section
+        available_frame = tk.Frame(content, bg=SURFACE, padx=16, pady=16)
+        available_frame.pack(fill="both", expand=True)
+
+        make_label(available_frame, "Available Badges", font=FONT_HEAD, bg=SURFACE).pack(anchor="w")
+
+        available_badges = gamif_svc.get_available_badges(self._user.id)
+        if available_badges:
+            badges_frame = tk.Frame(available_frame, bg=SURFACE)
+            badges_frame.pack(fill="both", expand=True, pady=(8, 0))
+
+            for badge in available_badges[:12]:  # Show first 12
+                badge_frame = tk.Frame(badges_frame, bg=SURFACE2, padx=12, pady=8)
+                badge_frame.pack(fill="x", pady=(0, 8))
+
+                # Badge icon and name
+                tk.Label(badge_frame, text=f"{badge['icon']} {badge['name']}",
+                        bg=SURFACE2, fg=TEXT, font=FONT_BODY).pack(anchor="w")
+
+                # Description and progress
+                tk.Label(badge_frame, text=badge['description'],
+                        bg=SURFACE2, fg=MUTED, font=FONT_SMALL, wraplength=400).pack(anchor="w", pady=(2, 0))
+
+                progress_text = f"Progress: {badge['current_progress']}/{badge['requirement_value']}"
+                tk.Label(badge_frame, text=progress_text,
+                        bg=SURFACE2, fg=ACCENT3, font=FONT_SMALL).pack(anchor="w")
+        else:
+            make_label(available_frame, "All badges earned! You're a champion!",
+                      fg=MUTED, bg=SURFACE).pack(anchor="w", pady=(8, 0))
+
+        tk.Frame(content, bg=BG).pack(fill="both", expand=True)
+
+    def _build_points_tab(self):
+        content = self._gamif_content
+
+        make_label(content, "Points System", font=FONT_HEAD).pack(anchor="w", pady=(0, 8))
+        make_label(content, "Earn points for various activities and level up your participation.",
+                   fg=MUTED, bg=BG).pack(anchor="w", pady=(0, 16))
+
+        # Current points display
+        points_info = gamif_svc.get_user_points(self._user.id)
+
+        points_card = tk.Frame(content, bg=SURFACE, padx=20, pady=20)
+        points_card.pack(fill="x", pady=(0, 16))
+
+        # Level indicator
+        level_frame = tk.Frame(points_card, bg=SURFACE)
+        level_frame.pack(fill="x", pady=(0, 12))
+
+        level_label = tk.Label(level_frame, text=f"Level {points_info['current_level']}",
+                              bg=SURFACE, fg=ACCENT, font=("Helvetica", 16, "bold"))
+        level_label.pack(side="left")
+
+        # Progress to next level
+        next_level_points = {1: 50, 2: 200, 3: 500, 4: 1000, 5: 999999}
+        current_needed = next_level_points.get(points_info['current_level'], 999999)
+        progress_pct = min(100, (points_info['total_points'] / current_needed) * 100) if current_needed > 0 else 100
+
+        progress_frame = tk.Frame(level_frame, bg=SURFACE)
+        progress_frame.pack(side="right", fill="x", expand=True, padx=(20, 0))
+
+        tk.Label(progress_frame, text=f"{points_info['total_points']}/{current_needed} points to next level",
+                bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(anchor="w")
+
+        # Progress bar
+        progress_bar = tk.Frame(progress_frame, bg=SURFACE2, height=8)
+        progress_bar.pack(fill="x", pady=(4, 0))
+        progress_bar.config(width=int(progress_pct * 2))  # Rough width approximation
+
+        # Points breakdown
+        breakdown_frame = tk.Frame(points_card, bg=SURFACE)
+        breakdown_frame.pack(fill="x")
+
+        def points_item(label, value, color=TEXT):
+            item_frame = tk.Frame(breakdown_frame, bg=SURFACE)
+            item_frame.pack(fill="x", pady=(4, 0))
+            tk.Label(item_frame, text=label, bg=SURFACE, fg=color, font=FONT_BODY).pack(side="left")
+            tk.Label(item_frame, text=str(value), bg=SURFACE, fg=color, font=FONT_BODY).pack(side="right")
+
+        points_item("Total Points", points_info['total_points'], ACCENT)
+        points_item("This Month", points_info['points_this_month'], ACCENT3)
+        points_item("Last Updated", points_info['last_updated'][:10], MUTED)
+
+        # Points earning guide
+        guide_frame = tk.Frame(content, bg=SURFACE, padx=16, pady=16)
+        guide_frame.pack(fill="both", expand=True)
+
+        make_label(guide_frame, "How to Earn Points", font=FONT_HEAD, bg=SURFACE).pack(anchor="w")
+
+        points_guide = [
+            ("🎯 Event Attendance", "10-25 points"),
+            ("💬 Feedback Submission", "5-15 points"),
+            ("🤝 Club Participation", "20 points"),
+            ("📚 Study Group Creation", "30 points"),
+            ("🦋 Social Connections", "5-10 points"),
+            ("🏆 Achievement Badges", "20-200 points")
+        ]
+
+        for activity, points in points_guide:
+            guide_item = tk.Frame(guide_frame, bg=SURFACE)
+            guide_item.pack(fill="x", pady=(6, 0))
+            tk.Label(guide_item, text=activity, bg=SURFACE, fg=TEXT, font=FONT_BODY).pack(side="left")
+            tk.Label(guide_item, text=points, bg=SURFACE, fg=ACCENT3, font=FONT_BODY).pack(side="right")
+
+        tk.Frame(content, bg=BG).pack(fill="both", expand=True)
+
+    def _build_leaderboards_tab(self):
+        content = self._gamif_content
+
+        make_label(content, "Leaderboards", font=FONT_HEAD).pack(anchor="w", pady=(0, 8))
+        make_label(content, "See how you rank against other participants.",
+                   fg=MUTED, bg=BG).pack(anchor="w", pady=(0, 16))
+
+        # Leaderboard categories
+        categories = [
+            ("Total Points", "total_points"),
+            ("Monthly Points", "monthly_points"),
+            ("Attendance Count", "attendance_streak")
+        ]
+
+        for cat_name, cat_key in categories:
+            cat_frame = tk.Frame(content, bg=SURFACE, padx=16, pady=16)
+            cat_frame.pack(fill="x", pady=(0, 12))
+
+            make_label(cat_frame, cat_name, font=FONT_HEAD, bg=SURFACE).pack(anchor="w")
+
+            leaderboard = gamif_svc.get_leaderboard(cat_key, limit=5)
+
+            if leaderboard:
+                for entry in leaderboard:
+                    entry_frame = tk.Frame(cat_frame, bg=SURFACE)
+                    entry_frame.pack(fill="x", pady=(6, 0))
+
+                    rank_text = f"#{entry['rank']}"
+                    tk.Label(entry_frame, text=rank_text, bg=SURFACE, fg=ACCENT,
+                            font=("Helvetica", 12, "bold"), width=4).pack(side="left")
+
+                    name_text = entry['username'][:15] + "..." if len(entry['username']) > 15 else entry['username']
+                    tk.Label(entry_frame, text=name_text, bg=SURFACE, fg=TEXT,
+                            font=FONT_BODY).pack(side="left", padx=(8, 0))
+
+                    score_text = f"{entry['score']:,}"
+                    tk.Label(entry_frame, text=score_text, bg=SURFACE, fg=ACCENT3,
+                            font=FONT_BODY).pack(side="right")
+            else:
+                make_label(cat_frame, "No data available yet.", fg=MUTED, bg=SURFACE).pack(anchor="w", pady=(8, 0))
+
+        tk.Frame(content, bg=BG).pack(fill="both", expand=True)
+
+    def _build_progress_tab(self):
+        content = self._gamif_content
+
+        make_label(content, "Progress Tracking", font=FONT_HEAD).pack(anchor="w", pady=(0, 8))
+        make_label(content, "Track your progress towards club membership requirements.",
+                   fg=MUTED, bg=BG).pack(anchor="w", pady=(0, 16))
+
+        progress_data = gamif_svc.get_user_progress(self._user.id)
+
+        if progress_data:
+            progress_frame = tk.Frame(content, bg=SURFACE, padx=16, pady=16)
+            progress_frame.pack(fill="both", expand=True)
+
+            for club_data in progress_data:
+                # Club header
+                club_header = tk.Frame(progress_frame, bg=SURFACE)
+                club_header.pack(fill="x", pady=(0, 12))
+
+                tk.Label(club_header, text=f"🏛️ {club_data['club_name']}",
+                        bg=SURFACE, fg=ACCENT, font=FONT_HEAD).pack(anchor="w")
+
+                # Requirements
+                for req in club_data['requirements']:
+                    req_frame = tk.Frame(progress_frame, bg=SURFACE2, padx=12, pady=8)
+                    req_frame.pack(fill="x", pady=(0, 8))
+
+                    req_name = req['requirement_type'].replace('_', ' ').title()
+                    tk.Label(req_frame, text=req_name, bg=SURFACE2, fg=TEXT, font=FONT_BODY).pack(anchor="w")
+
+                    progress_text = f"{req['current_value']}/{req['target_value']}"
+                    tk.Label(req_frame, text=progress_text, bg=SURFACE2, fg=ACCENT3, font=FONT_SMALL).pack(anchor="w")
+
+                    # Progress bar
+                    progress_pct = min(100, (req['current_value'] / req['target_value']) * 100) if req['target_value'] > 0 else 0
+
+                    progress_bar_frame = tk.Frame(req_frame, bg=SURFACE, height=6)
+                    progress_bar_frame.pack(fill="x", pady=(4, 0))
+
+                    if progress_pct > 0:
+                        progress_fill = tk.Frame(progress_bar_frame, bg=ACCENT, height=6, width=int(progress_pct * 2))
+                        progress_fill.pack(side="left")
+
+                    # Completion indicator
+                    if req['is_completed']:
+                        tk.Label(req_frame, text="✅ Completed!", bg=SURFACE2, fg="#28a745", font=FONT_SMALL).pack(anchor="e")
+        else:
+            make_label(content, "No progress data available.", fg=MUTED, bg=BG).pack(anchor="w")
+
+        tk.Frame(content, bg=BG).pack(fill="both", expand=True)
+
+    # Gamification action methods
+    def _show_badge_details(self, badge):
+        """Show detailed information about a badge."""
+        detail_window = tk.Toplevel(self)
+        detail_window.title(f"Achievement: {badge['name']}")
+        detail_window.geometry("400x300")
+        detail_window.configure(bg=BG)
+
+        # Badge icon and name
+        header_frame = tk.Frame(detail_window, bg=BG, padx=20, pady=20)
+        header_frame.pack(fill="x")
+
+        tk.Label(header_frame, text=badge['icon'], bg=BG, fg=ACCENT, font=("Helvetica", 48)).pack()
+        tk.Label(header_frame, text=badge['name'], bg=BG, fg=TEXT, font=FONT_TITLE).pack(pady=(8, 0))
+
+        # Description
+        desc_frame = tk.Frame(detail_window, bg=SURFACE, padx=20, pady=16)
+        desc_frame.pack(fill="x", pady=(0, 12))
+
+        tk.Label(desc_frame, text="Description", bg=SURFACE, fg=ACCENT3, font=FONT_HEAD).pack(anchor="w")
+        tk.Label(desc_frame, text=badge['description'], bg=SURFACE, fg=TEXT,
+                font=FONT_BODY, wraplength=360, justify="left").pack(anchor="w", pady=(8, 0))
+
+        # Details
+        details_frame = tk.Frame(detail_window, bg=SURFACE, padx=20, pady=16)
+        details_frame.pack(fill="x")
+
+        def detail_row(label, value):
+            row = tk.Frame(details_frame, bg=SURFACE)
+            row.pack(fill="x", pady=(4, 0))
+            tk.Label(row, text=label, bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(side="left")
+            tk.Label(row, text=str(value), bg=SURFACE, fg=TEXT, font=FONT_SMALL).pack(side="right")
+
+        detail_row("Category", badge['category'].title())
+        detail_row("Points Reward", badge['points_reward'])
+        detail_row("Earned", badge['earned_at'][:10] if badge.get('earned_at') else "Not earned")
+
+        # Close button
+        tk.Button(detail_window, text="Close", bg=ACCENT, fg="white", font=FONT_BTN,
+                 padx=20, pady=8, command=detail_window.destroy).pack(pady=20)
 
