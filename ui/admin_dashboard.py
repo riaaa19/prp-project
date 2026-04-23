@@ -262,7 +262,7 @@ class AdminDashboard(tk.Frame):
     # Section: Members
     # ══════════════════════════════════════════════════════════════════════
     def _build_members(self):
-        wrap = tk.Frame(self._content, bg=BG, padx=40, pady=30)
+        wrap = tk.Frame(self._content, bg=BG, padx=24, pady=16)
         wrap.pack(fill="both", expand=True)
         make_label(wrap, "Members", font=FONT_TITLE).pack(anchor="w")
         make_label(wrap, "List of registered students", fg=MUTED).pack(anchor="w", pady=(4, 16))
@@ -1200,10 +1200,10 @@ class AdminDashboard(tk.Frame):
         wrap.pack(fill="both", expand=True)
 
         make_label(wrap, "Event Calendar", font=FONT_TITLE).pack(anchor="center")
-        make_label(wrap, "Overview of events and day-by-day schedule", fg=MUTED).pack(anchor="center", pady=(4, 16))
+        make_label(wrap, "Overview of events and day-by-day schedule", fg=MUTED).pack(anchor="center", pady=(2, 10))
 
         controls = tk.Frame(wrap, bg=BG)
-        controls.pack(pady=(0, 12))
+        controls.pack(pady=(0, 8))
 
         make_button(controls, "◀", lambda: self._change_month(-1), width=4).pack(side="left")
         self._calendar_label = tk.Label(controls, text="", bg=BG, fg=ACCENT, font=FONT_BODY)
@@ -1212,8 +1212,8 @@ class AdminDashboard(tk.Frame):
 
         make_button(controls, "🔄 Refresh", self._refresh_event_calendar, color=SURFACE2, width=10).pack(side="left")
 
-        cal_frame = tk.Frame(wrap, bg=SURFACE, padx=14, pady=14, highlightthickness=1, highlightbackground=BORDER)
-        cal_frame.pack(anchor="center", pady=(0, 18))
+        cal_frame = tk.Frame(wrap, bg=SURFACE, padx=10, pady=10, highlightthickness=1, highlightbackground=BORDER)
+        cal_frame.pack(anchor="center", pady=(0, 10))
 
         self._day_buttons = []
         headers = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -1224,7 +1224,7 @@ class AdminDashboard(tk.Frame):
                 bg=SURFACE,
                 fg=MUTED,
                 font=FONT_SMALL,
-                width=5,
+                width=4,
             ).grid(row=0, column=idx, padx=3, pady=(0, 6))
 
         for week_idx in range(6):
@@ -1233,8 +1233,8 @@ class AdminDashboard(tk.Frame):
                 btn = tk.Button(
                     cal_frame,
                     text="",
-                    width=5,
-                    height=2,
+                    width=4,
+                    height=1,
                     bg=SURFACE2,
                     fg=TEXT,
                     relief="flat",
@@ -1256,7 +1256,8 @@ class AdminDashboard(tk.Frame):
 
         selected_cols = ("Event", "Club", "Present", "Absent", "Total")
         tv_frame, self._cal_tree = make_treeview(details, selected_cols)
-        tv_frame.pack(fill="both", expand=True)
+        tv_frame.pack(fill="both", expand=False)
+        self._cal_tree.configure(height=5)
         for c in ("Present", "Absent", "Total"):
             self._cal_tree.column(c, width=80, anchor="center")
 
@@ -1264,6 +1265,7 @@ class AdminDashboard(tk.Frame):
         month_cols = ("Date", "Event", "Club", "Present", "Absent", "Total")
         month_frame, self._month_events_tree = make_treeview(details, month_cols)
         month_frame.pack(fill="both", expand=True, pady=(8, 0))
+        self._month_events_tree.configure(height=9)
         for c in ("Present", "Absent", "Total"):
             self._month_events_tree.column(c, width=80, anchor="center")
 
