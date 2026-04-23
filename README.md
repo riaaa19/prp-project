@@ -102,20 +102,19 @@ prp-project/
 - Uses proper coding practices with functions, OOP (classes for models), and clean modular structure.
 - All team members contributed to different modules.
 
-## Team Contributions
-
-- **Team Member 1**: Developed authentication system and login UI.
-- **Team Member 2**: Implemented admin dashboard features (add/edit/delete events).
-- **Team Member 3**: Built student dashboard and registration services.
-- **Team Member 4**: Designed database schema and models.
-
 ## Project Video
 
-[Watch the project demo video](https://example.com/project-video) (Replace with actual video link)
+[Watch the project demo video](https://drive.google.com/file/d/1ENRX5eaDDaS8NzoMoosTZpT8g3q_jhlb/view?usp=sharing)
 
 ## GitHub Repository
 
 [View the project on GitHub](https://github.com/riaaa19/prp-project)
+
+## Team Contributions
+
+- **Jiya Mav**: Student Dashboard and panel
+- **Ria Oswal**: Admin Dashboard and panel
+- **Divit Shah**: Login Sign up changes
 
 ## Project Status
 
