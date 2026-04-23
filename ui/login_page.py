@@ -97,31 +97,6 @@ class SignInPanel(tk.Frame):
 
         make_label(box, "Sign In", font=FONT_TITLE).pack(pady=(0, 20))
 
-        self._role_var = tk.StringVar(value="student")
-        role_tabs = tk.Frame(box, bg=SURFACE2)
-        role_tabs.pack(fill="x", pady=(0, 18))
-
-        def make_role_tab(label, value):
-            btn = tk.Label(role_tabs, text=label,
-                           bg=ACCENT if self._role_var.get()==value else SURFACE,
-                           fg="white" if self._role_var.get()==value else TEXT,
-                           font=("Segoe UI", 10, "bold"), bd=0, relief="flat",
-                           padx=18, pady=10, cursor="hand2")
-            btn.pack(side="left", expand=True, fill="x", padx=4)
-
-            def _select_role(evt=None):
-                self._role_var.set(value)
-                for child in role_tabs.winfo_children():
-                    child_value = "student" if child.cget("text")=="Student" else "admin"
-                    child.config(bg=ACCENT if child_value == self._role_var.get() else SURFACE,
-                                 fg="white" if child_value == self._role_var.get() else TEXT)
-
-            btn.bind("<Button-1>", _select_role)
-            return btn
-
-        self._student_tab = make_role_tab("Student", "student")
-        self._admin_tab = make_role_tab("Admin", "admin")
-
         make_label(box, "Email", fg=MUTED, font=("Segoe UI", 9, "bold")).pack(anchor="w")
         self._email = make_entry(box, width=36)
         self._email.pack(pady=(6, 12))
@@ -139,11 +114,8 @@ class SignInPanel(tk.Frame):
         self._err.set("")
         email = self._email.get().strip()
         password = self._password.get()
-        requested_role = self._role_var.get()
         try:
             user = login(email, password)
-            if user.role != requested_role:
-                raise ValueError(f"Role mismatch: logged-in user is '{user.role}', not '{requested_role}'.")
             self._on_login_success(user)
         except ValueError as e:
             self._err.set(str(e))
