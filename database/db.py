@@ -72,6 +72,36 @@ def initialize_db():
         )
     """)
 
+    # ── Reminders ──────────────────────────────────────────────────────────
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS reminders (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            event_id        INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+            reminder_type   TEXT    NOT NULL CHECK(reminder_type IN ('event_start', 'event_update', 'weather_alert', 'transport')),
+            reminder_time   TEXT    NOT NULL,  -- ISO datetime string
+            is_active       INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0,1)),
+            created_at      TEXT    NOT NULL,
+            UNIQUE(user_id, event_id, reminder_type)
+        )
+    """)
+
+    # ── User Preferences ────────────────────────────────────────────────────
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS user_preferences (
+            id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id               INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            email_reminders       INTEGER NOT NULL DEFAULT 1 CHECK(email_reminders IN (0,1)),
+            push_notifications    INTEGER NOT NULL DEFAULT 1 CHECK(push_notifications IN (0,1)),
+            weather_alerts        INTEGER NOT NULL DEFAULT 1 CHECK(weather_alerts IN (0,1)),
+            transport_reminders   INTEGER NOT NULL DEFAULT 1 CHECK(transport_reminders IN (0,1)),
+            default_reminder_1day INTEGER NOT NULL DEFAULT 1 CHECK(default_reminder_1day IN (0,1)),
+            default_reminder_1hr  INTEGER NOT NULL DEFAULT 1 CHECK(default_reminder_1hr IN (0,1)),
+            updated_at            TEXT    NOT NULL,
+            UNIQUE(user_id)
+        )
+    """)
+
     # ── Seed data (only if tables are empty) ───────────────────────────────
     cur.execute("SELECT COUNT(*) FROM clubs")
     if cur.fetchone()[0] == 0:

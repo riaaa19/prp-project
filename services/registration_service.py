@@ -19,6 +19,15 @@ def register_student(user_id: int, event_id: int):
             (user_id, event_id),
         )
         conn.commit()
+
+        # Auto-create reminders for the registered event
+        try:
+            from services import reminder_service as rem_svc
+            rem_svc.create_event_reminders(user_id, event_id)
+        except ImportError:
+            # Reminders service not available, skip
+            pass
+
     except sqlite3.IntegrityError:
         raise ValueError("You are already registered for this event.")
     finally:

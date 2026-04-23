@@ -16,6 +16,7 @@ import services.attendance_service as att_svc
 import services.event_service as event_svc
 import services.registration_service as reg_svc
 import services.notification_service as notif_svc
+import services.reminder_service as rem_svc
 from ui.components import (
     BG, SURFACE, SURFACE2, ACCENT, ACCENT2, ACCENT3,
     TEXT, MUTED, BORDER, FONT_TITLE, FONT_HEAD, FONT_BODY, FONT_BTN, FONT_SMALL,
@@ -62,8 +63,7 @@ class StudentDashboard(tk.Frame):
             ("🎟  My Events",     "my_events"),
             ("👤  Profile",       "profile"),
             ("📊  Attendance",    "attendance"),
-            ("🏛️   Clubs",        "clubs"),
-            ("🔔  Notifications", "notifications"),
+            ("🏛️   Clubs",        "clubs"),            ("🔔  Reminders",     "reminders"),            ("🔔  Notifications", "notifications"),
         ]
         for label, key in nav_items:
             def make_nav_btn(lbl, ky):
@@ -115,6 +115,7 @@ class StudentDashboard(tk.Frame):
             "profile":     self._build_profile,
             "attendance":  self._build_attendance,
             "clubs":       self._build_clubs,
+            "reminders":   self._build_reminders,
             "notifications": self._build_notifications,
         }[key]()
 
@@ -943,6 +944,142 @@ class StudentDashboard(tk.Frame):
 
         if not clubs:
             make_label(clubs_frame, "No clubs found.", fg=MUTED, bg=BG).pack(anchor="w")
+
+    # ══════════════════════════════════════════════════════════════════════
+    # Section: Reminders
+    # ══════════════════════════════════════════════════════════════════════
+    def _build_reminders(self):
+        wrap = tk.Frame(self._content, bg=BG, padx=40, pady=30)
+        wrap.pack(fill="both", expand=True)
+
+        make_label(wrap, "Smart Reminders & Notifications", font=FONT_TITLE).pack(anchor="w")
+        make_label(wrap, "Manage your event reminders and notification preferences.",
+                   fg=MUTED).pack(anchor="w", pady=(4, 16))
+
+        # Get user preferences
+        prefs = rem_svc.get_user_preferences(self._user.id)
+
+        # Preferences section
+        prefs_card = tk.Frame(wrap, bg=SURFACE, padx=20, pady=20,
+                              highlightthickness=1, highlightbackground=BORDER)
+        prefs_card.pack(fill="x", pady=(0, 16))
+
+        make_label(prefs_card, "Notification Preferences", font=FONT_HEAD, bg=SURFACE).pack(anchor="w", pady=(0, 12))
+
+        # Create checkboxes for preferences
+        self._reminder_vars = {}
+        pref_options = [
+            ('email_reminders', 'Email Reminders'),
+            ('push_notifications', 'Push Notifications'),
+            ('weather_alerts', 'Weather Alerts'),
+            ('transport_reminders', 'Transportation Reminders'),
+            ('default_reminder_1day', '1 Day Before Events'),
+            ('default_reminder_1hr', '1 Hour Before Events'),
+        ]
+
+        prefs_grid = tk.Frame(prefs_card, bg=SURFACE)
+        prefs_grid.pack(fill="x")
+
+        for i, (key, label) in enumerate(pref_options):
+            row = i // 2
+            col = i % 2
+
+            if col == 0:
+                frame = tk.Frame(prefs_grid, bg=SURFACE)
+                frame.pack(fill="x", pady=(0, 8))
+
+            var = tk.BooleanVar(value=bool(prefs.get(key, 1)))
+            self._reminder_vars[key] = var
+
+            cb = tk.Checkbutton(frame, text=label, variable=var, bg=SURFACE,
+                               fg=TEXT, selectcolor=ACCENT, font=FONT_BODY)
+            cb.pack(side="left", padx=(0, 20))
+
+        make_button(prefs_card, "Save Preferences", self._save_reminder_preferences,
+                    color=ACCENT, width=16).pack(anchor="w", pady=(12, 0))
+
+        # Active reminders section
+        reminders_card = tk.Frame(wrap, bg=SURFACE, padx=20, pady=20,
+                                  highlightthickness=1, highlightbackground=BORDER)
+        reminders_card.pack(fill="both", expand=True)
+
+        make_label(reminders_card, "Your Active Reminders", font=FONT_HEAD, bg=SURFACE).pack(anchor="w", pady=(0, 12))
+
+        action_row = tk.Frame(reminders_card, bg=SURFACE)
+        action_row.pack(fill="x", pady=(0, 8))
+        make_button(action_row, "🔄  Refresh", self._refresh_reminders,
+                    color=SURFACE2, width=12).pack(side="left")
+        make_button(action_row, "⚙️  Setup for My Events", self._setup_event_reminders,
+                    color=ACCENT, width=18).pack(side="left", padx=(8, 0))
+
+        # Reminders list
+        cols = ("Event", "Type", "Time", "Status")
+        tv_frame, self._reminders_tree = make_treeview(reminders_card, cols)
+        tv_frame.pack(fill="both", expand=True)
+
+        self._load_reminders()
+
+        # Weather & Transport info section
+        info_card = tk.Frame(wrap, bg=SURFACE, padx=20, pady=20,
+                             highlightthickness=1, highlightbackground=BORDER)
+        info_card.pack(fill="x", pady=(12, 0))
+
+        make_label(info_card, "Weather & Transportation Info", font=FONT_HEAD, bg=SURFACE).pack(anchor="w", pady=(0, 12))
+
+        # Sample weather info
+        weather_frame = tk.Frame(info_card, bg=SURFACE)
+        weather_frame.pack(fill="x", pady=(0, 8))
+
+        make_label(weather_frame, "🌤️  Today's Weather: Sunny, 22°C", bg=SURFACE, font=FONT_BODY).pack(side="left")
+        make_label(weather_frame, "🚌 Next Shuttle: 14:00 (Main Campus)", bg=SURFACE, font=FONT_BODY).pack(side="right")
+
+        make_label(info_card, "Weather alerts and transport reminders will be sent based on your preferences.",
+                   fg=MUTED, bg=SURFACE, font=FONT_SMALL).pack(anchor="w")
+
+    def _save_reminder_preferences(self):
+        prefs = {key: int(var.get()) for key, var in self._reminder_vars.items()}
+        rem_svc.update_user_preferences(self._user.id, prefs)
+        show_toast(self, "Reminder preferences saved!", success=True)
+
+    def _load_reminders(self):
+        self._reminders_tree.delete(*self._reminders_tree.get_children())
+
+        reminders = rem_svc.get_user_reminders(self._user.id)
+
+        for reminder in reminders:
+            reminder_time = datetime.fromisoformat(reminder['reminder_time'])
+            time_str = reminder_time.strftime("%m/%d %H:%M")
+
+            status = "Active" if reminder['is_active'] else "Sent"
+            reminder_type_display = {
+                'event_start': 'Event Reminder',
+                'event_update': 'Event Update',
+                'weather_alert': 'Weather Alert',
+                'transport': 'Transport Reminder'
+            }.get(reminder['reminder_type'], reminder['reminder_type'])
+
+            self._reminders_tree.insert("", "end", values=(
+                reminder['event_name'],
+                reminder_type_display,
+                time_str,
+                status
+            ))
+
+    def _refresh_reminders(self):
+        self._load_reminders()
+        show_toast(self, "Reminders refreshed.", success=True)
+
+    def _setup_event_reminders(self):
+        """Setup reminders for all registered events."""
+        registered_events = reg_svc.get_events_for_student(self._user.id)
+
+        reminder_count = 0
+        for event in registered_events:
+            rem_svc.create_event_reminders(self._user.id, event['id'])
+            reminder_count += 1
+
+        self._load_reminders()
+        show_toast(self, f"Set up reminders for {reminder_count} event(s)!", success=True)
 
     # ══════════════════════════════════════════════════════════════════════
     # Section: Notifications
