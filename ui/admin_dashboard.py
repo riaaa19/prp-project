@@ -541,13 +541,35 @@ class AdminDashboard(tk.Frame):
         val = entry.get().strip()
         return "" if val == placeholder else val
 
+    def _is_duplicate_event(self, name, event_date, club):
+        name_key = name.strip().casefold()
+        date_key = event_date.strip()
+        club_key = club.strip().casefold()
+        for ev in event_svc.get_all_events():
+            if (
+                ev.name.strip().casefold() == name_key
+                and ev.date.strip() == date_key
+                and ev.club.strip().casefold() == club_key
+            ):
+                return True
+        return False
+
     def _submit_add_event(self):
+        self._ae_err.set("")
         name = self._get_entry_val(self._ae_name, "e.g. Tech Fest 2026")
         date = self._get_entry_val(self._ae_date, "YYYY-MM-DD")
         club = self._ae_club_var.get().strip()
         if club and club not in self._ae_clubs:
             self._ae_err.set("Please select a valid club from the list.")
             return
+        if name and date and club and self._is_duplicate_event(name, date, club):
+            should_continue = messagebox.askyesno(
+                "Duplicate Event Warning",
+                "An event with the same name, date, and club already exists.\n\nDo you want to add it anyway?",
+            )
+            if not should_continue:
+                self._ae_err.set("Event creation canceled to avoid duplicate entry.")
+                return
         try:
             event_svc.add_event(name, date, club)
             show_toast(self, "✅  Event added successfully!", success=True)
