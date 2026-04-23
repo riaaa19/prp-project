@@ -541,13 +541,35 @@ class AdminDashboard(tk.Frame):
         val = entry.get().strip()
         return "" if val == placeholder else val
 
+    def _is_duplicate_event(self, name, event_date, club):
+        name_key = name.strip().casefold()
+        date_key = event_date.strip()
+        club_key = club.strip().casefold()
+        for ev in event_svc.get_all_events():
+            if (
+                ev.name.strip().casefold() == name_key
+                and ev.date.strip() == date_key
+                and ev.club.strip().casefold() == club_key
+            ):
+                return True
+        return False
+
     def _submit_add_event(self):
+        self._ae_err.set("")
         name = self._get_entry_val(self._ae_name, "e.g. Tech Fest 2026")
         date = self._get_entry_val(self._ae_date, "YYYY-MM-DD")
         club = self._ae_club_var.get().strip()
         if club and club not in self._ae_clubs:
             self._ae_err.set("Please select a valid club from the list.")
             return
+        if name and date and club and self._is_duplicate_event(name, date, club):
+            should_continue = messagebox.askyesno(
+                "Duplicate Event Warning",
+                "An event with the same name, date, and club already exists.\n\nDo you want to add it anyway?",
+            )
+            if not should_continue:
+                self._ae_err.set("Event creation canceled to avoid duplicate entry.")
+                return
         try:
             event_svc.add_event(name, date, club)
             show_toast(self, "✅  Event added successfully!", success=True)
@@ -592,6 +614,58 @@ class AdminDashboard(tk.Frame):
         make_button(action_row, "🔄  Refresh", self._refresh_events,
                     color=SURFACE2, width=12).pack(side="right")
 
+        filter_card = tk.Frame(wrap, bg=SURFACE, padx=12, pady=10,
+                               highlightthickness=1, highlightbackground=BORDER)
+        filter_card.pack(fill="x", pady=(0, 8))
+
+        filter_row = tk.Frame(filter_card, bg=SURFACE)
+        filter_row.pack(fill="x")
+
+        tk.Label(filter_row, text="Search", bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(side="left")
+        self._ev_search_entry = make_entry(filter_row, width=24)
+        self._ev_search_entry.pack(side="left", padx=(8, 14))
+        self._ev_search_entry.bind("<KeyRelease>", self._apply_event_filters)
+
+        tk.Label(filter_row, text="Club", bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(side="left")
+        self._ev_club_filter_var = tk.StringVar(value="All Clubs")
+        self._ev_club_filter = ttk.Combobox(
+            filter_row,
+            textvariable=self._ev_club_filter_var,
+            state="readonly",
+            font=FONT_BODY,
+            width=16,
+        )
+        self._ev_club_filter.pack(side="left", padx=(8, 14))
+        self._ev_club_filter.bind("<<ComboboxSelected>>", self._apply_event_filters)
+
+        tk.Label(filter_row, text="Time", bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(side="left")
+        self._ev_time_filter_var = tk.StringVar(value="All")
+        self._ev_time_filter = ttk.Combobox(
+            filter_row,
+            textvariable=self._ev_time_filter_var,
+            values=["All", "Upcoming", "Today", "Past"],
+            state="readonly",
+            font=FONT_BODY,
+            width=10,
+        )
+        self._ev_time_filter.pack(side="left", padx=(8, 14))
+        self._ev_time_filter.bind("<<ComboboxSelected>>", self._apply_event_filters)
+
+        tk.Label(filter_row, text="Sort", bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(side="left")
+        self._ev_sort_var = tk.StringVar(value="Date (Newest)")
+        self._ev_sort = ttk.Combobox(
+            filter_row,
+            textvariable=self._ev_sort_var,
+            values=["Date (Newest)", "Date (Oldest)", "Name (A-Z)", "Name (Z-A)"],
+            state="readonly",
+            font=FONT_BODY,
+            width=14,
+        )
+        self._ev_sort.pack(side="left", padx=(8, 14))
+        self._ev_sort.bind("<<ComboboxSelected>>", self._apply_event_filters)
+
+        make_button(filter_row, "Reset", self._reset_event_filters, color=SURFACE2, width=8).pack(side="right")
+
         table_card = tk.Frame(wrap, bg=SURFACE, padx=12, pady=12,
                               highlightthickness=1, highlightbackground=BORDER)
         table_card.pack(fill="both", expand=True)
@@ -608,6 +682,8 @@ class AdminDashboard(tk.Frame):
         self._ev_tree.column("Club", width=180, anchor="w")
 
         self._load_events()
+        self._refresh_event_filter_options()
+        self._apply_event_filters()
 
         # action buttons
         btn_row = tk.Frame(table_card, bg=SURFACE)
@@ -624,8 +700,76 @@ class AdminDashboard(tk.Frame):
             self._ev_tree.insert("", "end", iid=ev.id,
                                  values=(ev.id, ev.name, ev.date, ev.club))
 
+    def _load_events_with_list(self, events):
+        self._ev_tree.delete(*self._ev_tree.get_children())
+        for ev in events:
+            self._ev_tree.insert("", "end", iid=ev.id,
+                                 values=(ev.id, ev.name, ev.date, ev.club))
+
+    def _refresh_event_filter_options(self):
+        clubs = sorted({ev.club for ev in event_svc.get_all_events() if ev.club})
+        values = ["All Clubs", *clubs]
+        self._ev_club_filter["values"] = values
+        if self._ev_club_filter_var.get() not in values:
+            self._ev_club_filter_var.set("All Clubs")
+
+    def _get_manage_events_filtered(self):
+        events = event_svc.get_all_events()
+        search_text = self._ev_search_entry.get().strip().lower()
+        club_filter = self._ev_club_filter_var.get().strip()
+        time_filter = self._ev_time_filter_var.get().strip()
+        sort_choice = self._ev_sort_var.get().strip()
+        today = date.today()
+
+        filtered = []
+        for ev in events:
+            haystack = f"{ev.name} {ev.date} {ev.club}".lower()
+            if search_text and search_text not in haystack:
+                continue
+
+            if club_filter and club_filter != "All Clubs" and ev.club != club_filter:
+                continue
+
+            ev_day = None
+            try:
+                ev_day = datetime.strptime(ev.date, "%Y-%m-%d").date()
+            except ValueError:
+                pass
+
+            if time_filter == "Upcoming" and (ev_day is None or ev_day < today):
+                continue
+            if time_filter == "Today" and ev_day != today:
+                continue
+            if time_filter == "Past" and (ev_day is None or ev_day >= today):
+                continue
+
+            filtered.append(ev)
+
+        if sort_choice == "Date (Oldest)":
+            filtered.sort(key=lambda ev: ev.date)
+        elif sort_choice == "Name (A-Z)":
+            filtered.sort(key=lambda ev: ev.name.lower())
+        elif sort_choice == "Name (Z-A)":
+            filtered.sort(key=lambda ev: ev.name.lower(), reverse=True)
+        else:
+            filtered.sort(key=lambda ev: ev.date, reverse=True)
+
+        return filtered
+
+    def _apply_event_filters(self, _event=None):
+        filtered = self._get_manage_events_filtered()
+        self._load_events_with_list(filtered)
+
+    def _reset_event_filters(self):
+        self._ev_search_entry.delete(0, "end")
+        self._ev_club_filter_var.set("All Clubs")
+        self._ev_time_filter_var.set("All")
+        self._ev_sort_var.set("Date (Newest)")
+        self._apply_event_filters()
+
     def _refresh_events(self):
-        self._load_events()
+        self._refresh_event_filter_options()
+        self._apply_event_filters()
         show_toast(self, "Events refreshed.", success=True)
 
     def _get_selected_event(self):
@@ -643,7 +787,7 @@ class AdminDashboard(tk.Frame):
         if messagebox.askyesno("Confirm Delete", f"Delete '{name}'? This will also remove all registrations."):
             event_svc.delete_event(event_id)
             show_toast(self, f"'{name}' deleted.", success=False)
-            self._load_events()
+            self._refresh_events()
 
     def _edit_event(self):
         row = self._get_selected_event()
@@ -682,7 +826,7 @@ class AdminDashboard(tk.Frame):
                 event_svc.update_event(event_id, entries[0].get(),
                                        entries[1].get(), entries[2].get())
                 show_toast(self, "Event updated!", success=True)
-                self._load_events()
+                self._refresh_events()
                 dlg.destroy()
             except ValueError as exc:
                 err_var.set(str(exc))
