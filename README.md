@@ -91,6 +91,11 @@ prp-project/
 - The app uses a modular architecture to separate UI, services, models, and database logic.
 - Add more event and user data from the admin dashboard after logging in.
 
+  Demo
+  https://drive.google.com/file/d/1ENRX5eaDDaS8NzoMoosTZpT8g3q_jhlb/view?usp=sharing
+
 ## Contribution
 
-Feel free to extend the project by adding user registration approval, improved event search, or enhanced reporting features.
+Student Dashborad and panel- Jiya Mav
+Admin Dashborad and panel- Ria Oswal
+Login Sign up changes -Divit Shah
