@@ -21,7 +21,17 @@ from ui.components import (
     TEXT, MUTED, BORDER, FONT_TITLE, FONT_HEAD, FONT_BODY, FONT_BTN, FONT_SMALL,
     make_frame, make_card, make_label, make_entry, make_button, make_treeview, show_toast,
 )
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
+def fade_in(widget, step=0):
+    try:
+        if step > 1:
+            return
+        widget.attributes("-alpha", step)
+        widget.after(20, lambda: fade_in(widget, step + 0.08))
+    except:
+        pass
 
 class StudentDashboard(tk.Frame):
     def __init__(self, parent, user, on_logout):
@@ -94,23 +104,31 @@ class StudentDashboard(tk.Frame):
     # Navigation
     # ══════════════════════════════════════════════════════════════════════
     def _show_section(self, key: str):
-        for k, btn in self._nav_btns.items():
-            if k == key:
-                btn.config(bg=ACCENT, fg="white", relief="flat")
-            else:
-                btn.config(bg=SURFACE, fg=TEXT, relief="flat")
-        self._active_section = key
+    for k, btn in self._nav_btns.items():
+        if k == key:
+            btn.config(bg=ACCENT, fg="white")
+        else:
+            btn.config(bg=SURFACE, fg=TEXT)
 
-        for w in self._content.winfo_children():
-            w.destroy()
+    self._active_section = key
 
-        {
-            "overview":    self._build_overview,
-            "view_events": self._build_view_events,
-            "register":    self._build_register,
-            "my_events":   self._build_my_events,
-            "notifications": self._build_notifications,
-        }[key]()
+    for w in self._content.winfo_children():
+        w.destroy()
+
+    # 🔥 animation
+    try:
+        self._content.attributes("-alpha", 0)
+        fade_in(self._content)
+    except:
+        pass
+
+    {
+        "overview":    self._build_overview,
+        "view_events": self._build_view_events,
+        "register":    self._build_register,
+        "my_events":   self._build_my_events,
+        "notifications": self._build_notifications,
+    }[key]()
 
     def _safe_parse_date(self, value: str):
         try:
@@ -157,113 +175,55 @@ class StudentDashboard(tk.Frame):
         return f"Starts in {days_left} day(s)"
 
     def _build_overview(self):
-        wrap = tk.Frame(self._content, bg=BG, padx=30, pady=24)
-        wrap.pack(fill="both", expand=True)
+    wrap = tk.Frame(self._content, bg=BG, padx=30, pady=24)
+    wrap.pack(fill="both", expand=True)
 
-        make_label(wrap, "Student Overview", font=FONT_TITLE).pack(anchor="w")
-        make_label(wrap, "Your events, notifications, and next steps in one place.",
-                   fg=MUTED).pack(anchor="w", pady=(4, 12))
+    make_label(wrap, "Student Overview", font=FONT_TITLE).pack(anchor="w")
 
-        registered_events = self._get_registered_events()
-        registered_ids = {event["id"] for event in registered_events}
-        unread_count = notif_svc.get_unread_count(self._user.id)
-        attendance_rows = [
-            row for row in att_svc.get_all_attendance()
-            if row["user_id"] == self._user.id and row["status"] == "present"
-        ]
+    registered_events = self._get_registered_events()
+    unread_count = notif_svc.get_unread_count(self._user.id)
 
-        upcoming_registered = []
-        open_events = []
-        today = date.today()
-        for ev in event_svc.get_all_events():
-            event_day = self._safe_parse_date(ev.date)
-            if ev.id not in registered_ids:
-                open_events.append(ev)
-            if event_day and event_day >= today and ev.id in registered_ids:
-                upcoming_registered.append((event_day, ev))
+    total_events = len(event_svc.get_all_events())
+    my_events = len(registered_events)
 
-        upcoming_registered.sort(key=lambda item: item[0])
-        next_event_text = "No upcoming registered events"
-        if upcoming_registered:
-            next_event = upcoming_registered[0][1]
-            next_event_text = f"{next_event.name} • {next_event.date}"
+    # 🔥 CARDS (cleaner UI)
+    row = tk.Frame(wrap, bg=BG)
+    row.pack(fill="x", pady=15)
 
-        card_row = tk.Frame(wrap, bg=BG)
-        card_row.pack(fill="x", pady=(6, 16))
+    def card(title, value):
+        c = tk.Frame(row, bg=SURFACE, padx=16, pady=16,
+                     highlightthickness=1, highlightbackground=BORDER)
+        c.pack(side="left", expand=True, fill="x", padx=6)
+        tk.Label(c, text=title, bg=SURFACE, fg=MUTED).pack(anchor="w")
+        tk.Label(c, text=value, bg=SURFACE, fg=ACCENT,
+                 font=("Segoe UI", 20, "bold")).pack(anchor="w")
 
-        def summary_card(parent, title, value, note, accent):
-            card = make_card(parent, bg=SURFACE, padx=16, pady=16)
-            card.pack(side="left", expand=True, fill="x", padx=6)
-            tk.Label(card, text=title, bg=SURFACE, fg=MUTED, font=("Segoe UI", 9)).pack(anchor="w")
-            tk.Label(card, text=str(value), bg=SURFACE, fg=accent, font=("Segoe UI", 24, "bold")).pack(anchor="w", pady=(2, 0))
-            tk.Label(card, text=note, bg=SURFACE, fg=MUTED, font=("Segoe UI", 9)).pack(anchor="w", pady=(2, 0))
-            return card
+    card("My Events", my_events)
+    card("All Events", total_events)
+    card("Notifications", unread_count)
 
-        summary_card(card_row, "My Events", len(registered_events), "Registered activities", ACCENT)
-        summary_card(card_row, "Upcoming", len(upcoming_registered), "Still ahead on your schedule", ACCENT3)
-        summary_card(card_row, "Unread", unread_count, "Notification(s) waiting", ACCENT2)
-        summary_card(card_row, "Present", len(attendance_rows), "Attendance marked present", ACCENT3)
+    # 🔥 CHART (NEW)
+    chart_frame = tk.Frame(wrap, bg=SURFACE)
+    chart_frame.pack(fill="both", expand=True, pady=10)
 
-        lower = tk.Frame(wrap, bg=BG)
-        lower.pack(fill="both", expand=True)
+    fig, ax = plt.subplots(figsize=(5, 2.5))
+    ax.bar(["My Events", "All Events"],
+           [my_events, total_events])
+    ax.set_title("Your Activity")
 
-        left = tk.Frame(lower, bg=BG)
-        left.pack(side="left", fill="both", expand=True, padx=(0, 8))
-        right = tk.Frame(lower, bg=BG, width=280)
-        right.pack(side="left", fill="y")
-        right.pack_propagate(False)
+    canvas = FigureCanvasTkAgg(fig, master=chart_frame)
+    canvas.draw()
+    canvas.get_tk_widget().pack(fill="both", expand=True)
 
-        quick = make_card(left, bg=SURFACE, padx=16, pady=16)
-        quick.pack(fill="x", pady=(0, 12))
-        make_label(quick, "Quick Actions", font=FONT_HEAD, bg=SURFACE).pack(anchor="w")
-        make_label(quick, f"Next event: {next_event_text}", fg=MUTED, bg=SURFACE).pack(anchor="w", pady=(2, 10))
-        actions = tk.Frame(quick, bg=SURFACE)
-        actions.pack(fill="x")
-        make_button(actions, "Browse Events", lambda: self._show_section("view_events"), width=14).pack(side="left")
-        make_button(actions, "My Schedule", lambda: self._show_section("my_events"), color=ACCENT3, width=14).pack(side="left", padx=(8, 0))
-        make_button(actions, "Notifications", lambda: self._show_section("notifications"), color=SURFACE2, width=14).pack(side="left", padx=(8, 0))
+    # 🔥 SMART INSIGHT
+    if my_events == 0:
+        insight = "You haven’t registered yet ⚠️"
+    elif my_events < 3:
+        insight = "Good start 👍"
+    else:
+        insight = "Very active 🎉"
 
-        make_label(left, "Suggested Events", font=FONT_HEAD).pack(anchor="w")
-        make_label(left, "Events you have not registered for yet.", fg=MUTED).pack(anchor="w", pady=(0, 8))
-        suggestion_box = make_card(left, bg=SURFACE, padx=16, pady=12)
-        suggestion_box.pack(fill="both", expand=True)
-
-        if open_events:
-            for ev in open_events[:4]:
-                tk.Label(
-                    suggestion_box,
-                    text=f"• {ev.name}\n  {ev.date} • {ev.club}\n  {self._format_event_status(ev.date)}",
-                    bg=SURFACE,
-                    fg=TEXT,
-                    justify="left",
-                    anchor="w",
-                    wraplength=500,
-                    font=FONT_SMALL,
-                ).pack(anchor="w", fill="x", pady=(0, 8))
-        else:
-            make_label(suggestion_box, "You are already registered for all available events.",
-                       fg=MUTED, bg=SURFACE).pack(anchor="w")
-
-        side_card = make_card(right, bg=SURFACE, padx=14, pady=14)
-        side_card.pack(fill="both", expand=True)
-        make_label(side_card, "Latest Updates", font=FONT_HEAD, bg=SURFACE).pack(anchor="w")
-        notes = notif_svc.get_notifications(self._user.id)[:4]
-        if notes:
-            for note in notes:
-                tag = "Unread" if note["read_flag"] == 0 else "Read"
-                tk.Label(
-                    side_card,
-                    text=f"• {tag}: {note['message']}",
-                    bg=SURFACE,
-                    fg=TEXT,
-                    justify="left",
-                    anchor="w",
-                    wraplength=240,
-                    font=FONT_SMALL,
-                ).pack(anchor="w", fill="x", pady=(0, 8))
-        else:
-            make_label(side_card, "No notifications yet.", fg=MUTED, bg=SURFACE).pack(anchor="w")
-
+    make_label(wrap, f"Insight: {insight}", fg=ACCENT).pack(anchor="w", pady=10)
     # ══════════════════════════════════════════════════════════════════════
     # Section: View Events
     # ══════════════════════════════════════════════════════════════════════
@@ -271,7 +231,7 @@ class StudentDashboard(tk.Frame):
         wrap = tk.Frame(self._content, bg=BG, padx=40, pady=30)
         wrap.pack(fill="both", expand=True)
 
-        make_label(wrap, "All Events", font=FONT_TITLE).pack(anchor="w")
+       make_label(wrap, "Search + filter events smartly", fg=MUTED).pack(anchor="w")
         make_label(wrap, "Browse upcoming college club events.",
                    fg=MUTED).pack(anchor="w", pady=(4, 12))
 
