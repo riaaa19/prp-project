@@ -1126,7 +1126,8 @@ class StudentDashboard(tk.Frame):
 
         for i, tab_name in enumerate(tab_names):
             btn = tk.Button(tab_btn_frame, text=tab_name, bg=SURFACE, fg=TEXT,
-                           font=FONT_BODY, relief="flat", bd=0, padx=20, pady=8,
+                           font=FONT_BODY, relief="flat", bd=0, width=16,
+                           padx=20, pady=8,
                            command=lambda t=tab_name.lower().replace(" ", "_"): self._switch_social_tab(t))
             btn.pack(side="left", padx=2)
             self._tab_buttons[tab_name.lower().replace(" ", "_")] = btn
@@ -1221,6 +1222,8 @@ class StudentDashboard(tk.Frame):
             make_label(content, "No friends yet. Send some friend requests to get started!",
                       fg=MUTED, bg=BG).pack(anchor="w")
 
+        tk.Frame(content, bg=BG).pack(fill="both", expand=True)
+
     def _build_study_groups_tab(self):
         content = self._social_content
 
@@ -1280,6 +1283,8 @@ class StudentDashboard(tk.Frame):
             make_label(content, "No study groups available. Create one to get started!",
                       fg=MUTED, bg=BG).pack(anchor="w")
 
+        tk.Frame(content, bg=BG).pack(fill="both", expand=True)
+
     def _build_ambassadors_tab(self):
         content = self._social_content
 
@@ -1322,6 +1327,8 @@ class StudentDashboard(tk.Frame):
         else:
             make_label(content, "No club ambassadors available at the moment.",
                       fg=MUTED, bg=BG).pack(anchor="w")
+
+        tk.Frame(content, bg=BG).pack(fill="both", expand=True)
 
     def _build_share_events_tab(self):
         content = self._social_content
@@ -1366,6 +1373,8 @@ class StudentDashboard(tk.Frame):
         else:
             make_label(content, "Register for events to start sharing them with friends!",
                       fg=MUTED, bg=BG).pack(anchor="w")
+
+        tk.Frame(content, bg=BG).pack(fill="both", expand=True)
 
     # Social action methods
     def _send_friend_request(self, username):
@@ -1447,6 +1456,7 @@ class StudentDashboard(tk.Frame):
         tv_frame.pack(fill="both", expand=True)
         self._notif_tree.column("Time", width=160)
         self._notif_tree.column("Status", width=110, anchor="center")
+        self._notif_tree.config(height=14)
 
         self._load_notifications()
 

@@ -146,7 +146,7 @@ def make_label(parent, text, font=FONT_BODY, fg=TEXT, **kw):
     return tk.Label(parent, **defaults)
 
 
-def make_entry(parent, show=None, width=30):
+def make_entry(parent, show=None, width=30, placeholder=None):
     """Create a premium styled entry widget."""
     e = tk.Entry(parent,
                  font=FONT_BODY,
@@ -162,17 +162,33 @@ def make_entry(parent, show=None, width=30):
                  insertborderwidth=0)
     if show:
         e.config(show=show)
-    
-    # Hover effect on border
-    def on_focus_in(event):
-        e.config(highlightbackground=ACCENT_LIGHT)
-    
-    def on_focus_out(event):
-        e.config(highlightbackground=BORDER)
-    
+
+    if placeholder:
+        placeholder_text = placeholder
+        e.insert(0, placeholder_text)
+        e.config(fg=MUTED)
+
+        def on_focus_in(event):
+            if e.get() == placeholder_text:
+                e.delete(0, tk.END)
+                e.config(fg=TEXT)
+            e.config(highlightbackground=ACCENT_LIGHT)
+
+        def on_focus_out(event):
+            if not e.get().strip():
+                e.insert(0, placeholder_text)
+                e.config(fg=MUTED)
+            e.config(highlightbackground=BORDER)
+    else:
+        def on_focus_in(event):
+            e.config(highlightbackground=ACCENT_LIGHT)
+
+        def on_focus_out(event):
+            e.config(highlightbackground=BORDER)
+
     e.bind("<FocusIn>", on_focus_in)
     e.bind("<FocusOut>", on_focus_out)
-    
+
     return e
 
 
