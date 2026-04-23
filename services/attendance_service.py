@@ -3,6 +3,7 @@ basedir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if basedir not in sys.path:
     sys.path.insert(0, basedir)
 from database.db import get_connection
+import services.gamification_service as gamif_svc
 
 
 """
@@ -33,6 +34,12 @@ def mark_attendance(user_id: int, event_id: int, status: str):
             (user_id, event_id, status),
         )
         conn.commit()
+
+        # Award points and check achievements if attendance is present
+        if status == "present":
+            gamif_svc.award_points(user_id, 10, "event_attendance", event_id)
+            gamif_svc.check_and_award_achievements(user_id)
+
         return True
     finally:
         conn.close()
