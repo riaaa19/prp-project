@@ -262,62 +262,119 @@ class AdminDashboard(tk.Frame):
     # Section: Members
     # ══════════════════════════════════════════════════════════════════════
     def _build_members(self):
-        wrap = tk.Frame(self._content, bg=BG, padx=40, pady=30)
+        wrap = tk.Frame(self._content, bg=BG, padx=24, pady=20)
         wrap.pack(fill="both", expand=True)
         make_label(wrap, "Members", font=FONT_TITLE).pack(anchor="w")
-        make_label(wrap, "List of registered students", fg=MUTED).pack(anchor="w", pady=(4, 16))
+        make_label(wrap, "List of registered students", fg=MUTED).pack(anchor="w", pady=(2, 12))
+
+        members = user_svc.get_all_members()
+        total_members = len(members)
+        student_count = len([m for m in members if (m.get("role") or "").lower() == "student"])
+        admin_count = len([m for m in members if (m.get("role") or "").lower() == "admin"])
+
+        summary = tk.Frame(wrap, bg=BG)
+        summary.pack(fill="x", pady=(0, 10))
+
+        def member_stat(parent, title, value, accent):
+            card = tk.Frame(parent, bg=SURFACE, padx=14, pady=12,
+                            highlightthickness=1, highlightbackground=BORDER)
+            card.pack(side="left", fill="x", expand=True, padx=(0, 8))
+            tk.Label(card, text=title, bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(anchor="w")
+            tk.Label(card, text=str(value), bg=SURFACE, fg=accent, font=("Segoe UI", 16, "bold")).pack(anchor="w", pady=(4, 0))
+
+        member_stat(summary, "Total Members", total_members, ACCENT)
+        member_stat(summary, "Students", student_count, ACCENT3)
+        member_stat(summary, "Admins", admin_count, ACCENT2)
+
+        table_card = tk.Frame(wrap, bg=SURFACE, padx=12, pady=12,
+                              highlightthickness=1, highlightbackground=BORDER)
+        table_card.pack(fill="both", expand=True)
+        make_label(table_card, "Member Directory", font=FONT_HEAD, bg=SURFACE).pack(anchor="w")
+        make_label(table_card, "All active users and their roles.", fg=MUTED, bg=SURFACE).pack(anchor="w", pady=(2, 8))
+
         cols = ("Name", "Email", "Role")
-        tv_frame, members_tree = make_treeview(wrap, cols)
+        tv_frame, members_tree = make_treeview(table_card, cols)
         tv_frame.pack(fill="both", expand=True)
-        for m in user_svc.get_all_members():
+        members_tree.configure(height=14)
+        members_tree.column("Name", width=220, anchor="w")
+        members_tree.column("Email", width=280, anchor="w")
+        members_tree.column("Role", width=120, anchor="center")
+        for m in members:
             members_tree.insert("", "end", values=(m["username"], m["email"], m["role"]))
 
     # ══════════════════════════════════════════════════════════════════════
     # Section: Clubs
     # ══════════════════════════════════════════════════════════════════════
     def _build_clubs(self):
-        wrap = tk.Frame(self._content, bg=BG, padx=40, pady=30)
+        wrap = tk.Frame(self._content, bg=BG, padx=24, pady=20)
         wrap.pack(fill="both", expand=True)
         make_label(wrap, "Clubs", font=FONT_TITLE).pack(anchor="w")
-        make_label(wrap, "Create and manage clubs", fg=MUTED).pack(anchor="w", pady=(4, 16))
+        make_label(wrap, "Create and manage clubs", fg=MUTED).pack(anchor="w", pady=(2, 12))
 
-        form = tk.Frame(wrap, bg=SURFACE, padx=16, pady=16,
+        clubs = club_svc.get_all_clubs()
+        summary_row = tk.Frame(wrap, bg=BG)
+        summary_row.pack(fill="x", pady=(0, 12))
+
+        def stat_card(parent, title, value, accent):
+            card = tk.Frame(parent, bg=SURFACE, padx=14, pady=12,
+                            highlightthickness=1, highlightbackground=BORDER)
+            card.pack(side="left", fill="x", expand=True, padx=(0, 8))
+            tk.Label(card, text=title, bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(anchor="w")
+            tk.Label(card, text=value, bg=SURFACE, fg=accent, font=("Segoe UI", 16, "bold")).pack(anchor="w", pady=(4, 0))
+
+        latest_label = clubs[-1]["name"] if clubs else "No clubs yet"
+        stat_card(summary_row, "Total Clubs", str(len(clubs)), ACCENT3)
+        stat_card(summary_row, "Latest Club", latest_label, ACCENT)
+
+        form = tk.Frame(wrap, bg=SURFACE, padx=18, pady=16,
                         highlightthickness=1, highlightbackground=BORDER)
-        form.pack(fill="x", pady=(0, 12))
+        form.pack(fill="x", pady=(0, 10))
+
+        make_label(form, "Add a New Club", font=FONT_HEAD, bg=SURFACE).grid(row=0, column=0, columnspan=3, sticky="w")
+        make_label(form, "Use a clear name and short description.", fg=MUTED, bg=SURFACE).grid(
+            row=1, column=0, columnspan=3, sticky="w", pady=(2, 10)
+        )
 
         tk.Label(form, text="Club Name", bg=SURFACE, fg=MUTED,
-                 font=("Helvetica", 9, "bold")).grid(row=0, column=0, sticky="w")
+                 font=("Helvetica", 9, "bold")).grid(row=2, column=0, sticky="w")
         tk.Label(form, text="Description", bg=SURFACE, fg=MUTED,
-                 font=("Helvetica", 9, "bold")).grid(row=0, column=1, sticky="w", padx=(10, 0))
+                 font=("Helvetica", 9, "bold")).grid(row=2, column=1, sticky="w", padx=(10, 0))
 
         self._club_name_entry = make_entry(form, width=26)
-        self._club_name_entry.grid(row=1, column=0, sticky="we", pady=(4, 0))
+        self._club_name_entry.grid(row=3, column=0, sticky="we", pady=(4, 0))
         self._club_desc_entry = make_entry(form, width=44)
-        self._club_desc_entry.grid(row=1, column=1, sticky="we", padx=(10, 0), pady=(4, 0))
+        self._club_desc_entry.grid(row=3, column=1, sticky="we", padx=(10, 0), pady=(4, 0))
 
         btn_row = tk.Frame(form, bg=SURFACE)
-        btn_row.grid(row=1, column=2, padx=(12, 0), sticky="e")
+        btn_row.grid(row=3, column=2, padx=(12, 0), sticky="e")
         make_button(btn_row, "➕ Add Club", self._submit_add_club, width=12).pack(side="left")
         make_button(btn_row, "🔄 Refresh", self._load_clubs, color=SURFACE2, width=10).pack(side="left", padx=(8, 0))
 
         form.columnconfigure(0, weight=1)
         form.columnconfigure(1, weight=1)
 
+        table_card = tk.Frame(wrap, bg=SURFACE, padx=12, pady=12,
+                              highlightthickness=1, highlightbackground=BORDER)
+        table_card.pack(fill="both", expand=True)
+        make_label(table_card, "Club Directory", font=FONT_HEAD, bg=SURFACE).pack(anchor="w")
+        make_label(table_card, "Select a row to edit details or remove a club.", fg=MUTED, bg=SURFACE).pack(anchor="w", pady=(2, 8))
+
         cols = ("Name", "Description", "Created")
-        tv_frame, self._clubs_tree = make_treeview(wrap, cols)
+        tv_frame, self._clubs_tree = make_treeview(table_card, cols)
         tv_frame.pack(fill="both", expand=True)
+        self._clubs_tree.configure(height=12)
         self._clubs_tree.column("Description", width=360, anchor="w")
         self._clubs_tree.column("Name", width=180, anchor="w")
 
         self._load_clubs()
 
         # action buttons
-        btn_row = tk.Frame(wrap, bg=BG)
+        btn_row = tk.Frame(table_card, bg=SURFACE)
         btn_row.pack(fill="x", pady=(12, 0))
         make_button(btn_row, "✏️  Edit Selected", self._edit_club,
-                    color=ACCENT, width=16).pack(side="left", padx=(0, 8))
+                    color=ACCENT, width=16).pack(side="right", padx=(8, 0))
         make_button(btn_row, "🗑  Delete Selected", self._delete_club,
-                    color=ACCENT2, width=16).pack(side="left")
+                    color=ACCENT2, width=16).pack(side="right")
 
     def _load_clubs(self):
         self._clubs_tree.delete(*self._clubs_tree.get_children())
@@ -411,16 +468,19 @@ class AdminDashboard(tk.Frame):
     # Section: Add Event
     # ══════════════════════════════════════════════════════════════════════
     def _build_add_event(self):
-        wrap = tk.Frame(self._content, bg=BG, padx=40, pady=30)
+        wrap = tk.Frame(self._content, bg=BG, padx=24, pady=20)
         wrap.pack(fill="both", expand=True)
 
         make_label(wrap, "Add New Event", font=FONT_TITLE).pack(anchor="w")
         make_label(wrap, "Fill in the details below to create an event.",
-                   fg=MUTED).pack(anchor="w", pady=(4, 24))
+                   fg=MUTED).pack(anchor="w", pady=(2, 12))
 
-        card = tk.Frame(wrap, bg=SURFACE, padx=30, pady=30,
+        card = tk.Frame(wrap, bg=SURFACE, padx=22, pady=20,
                         highlightthickness=1, highlightbackground=BORDER)
-        card.pack(fill="x", ipadx=10, ipady=10)
+        card.pack(fill="x")
+
+        make_label(card, "Event Details", font=FONT_HEAD, bg=SURFACE).pack(anchor="w")
+        make_label(card, "Use ISO date format for best compatibility.", fg=MUTED, bg=SURFACE).pack(anchor="w", pady=(2, 10))
 
         fields = [
             ("Event Name",  "e.g. Tech Fest 2026"),
@@ -462,7 +522,10 @@ class AdminDashboard(tk.Frame):
         if not clubs:
             self._ae_err.set("No clubs available. Add a club first in the Clubs section.")
 
-        make_button(card, "➕  Add Event", self._submit_add_event, width=20).pack(anchor="w", pady=(10, 0))
+        button_row = tk.Frame(card, bg=SURFACE)
+        button_row.pack(fill="x", pady=(10, 0))
+        make_button(button_row, "➕  Add Event", self._submit_add_event, width=18).pack(side="left")
+        make_button(button_row, "📅  Manage Events", lambda: self._show_section("manage_events"), color=SURFACE2, width=18).pack(side="left", padx=(8, 0))
 
     def _clear_ph(self, entry, placeholder):
         if entry.get() == placeholder:
@@ -496,12 +559,31 @@ class AdminDashboard(tk.Frame):
     # Section: Manage Events
     # ══════════════════════════════════════════════════════════════════════
     def _build_manage_events(self):
-        wrap = tk.Frame(self._content, bg=BG, padx=40, pady=30)
+        wrap = tk.Frame(self._content, bg=BG, padx=24, pady=20)
         wrap.pack(fill="both", expand=True)
 
         make_label(wrap, "Manage Events", font=FONT_TITLE).pack(anchor="w")
         make_label(wrap, "Select a row to edit or delete an event.",
-                   fg=MUTED).pack(anchor="w", pady=(4, 16))
+                   fg=MUTED).pack(anchor="w", pady=(2, 12))
+
+        events = event_svc.get_all_events()
+        summary_row = tk.Frame(wrap, bg=BG)
+        summary_row.pack(fill="x", pady=(0, 10))
+
+        def ev_stat(parent, title, value, accent):
+            card = tk.Frame(parent, bg=SURFACE, padx=14, pady=12,
+                            highlightthickness=1, highlightbackground=BORDER)
+            card.pack(side="left", fill="x", expand=True, padx=(0, 8))
+            tk.Label(card, text=title, bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(anchor="w")
+            tk.Label(card, text=value, bg=SURFACE, fg=accent, font=("Segoe UI", 16, "bold")).pack(anchor="w", pady=(4, 0))
+
+        upcoming_count = 0
+        today = date.today().isoformat()
+        for ev in events:
+            if ev.date >= today:
+                upcoming_count += 1
+        ev_stat(summary_row, "Total Events", str(len(events)), ACCENT)
+        ev_stat(summary_row, "Upcoming", str(upcoming_count), ACCENT3)
 
         action_row = tk.Frame(wrap, bg=BG)
         action_row.pack(fill="x", pady=(0, 8))
@@ -510,22 +592,31 @@ class AdminDashboard(tk.Frame):
         make_button(action_row, "🔄  Refresh", self._refresh_events,
                     color=SURFACE2, width=12).pack(side="right")
 
-        # Treeview
+        table_card = tk.Frame(wrap, bg=SURFACE, padx=12, pady=12,
+                              highlightthickness=1, highlightbackground=BORDER)
+        table_card.pack(fill="both", expand=True)
+        make_label(table_card, "Event List", font=FONT_HEAD, bg=SURFACE).pack(anchor="w")
+        make_label(table_card, "Select any event to edit details or delete it.", fg=MUTED, bg=SURFACE).pack(anchor="w", pady=(2, 8))
+
         cols = ("ID", "Name", "Date", "Club")
-        tv_frame, self._ev_tree = make_treeview(wrap, cols)
+        tv_frame, self._ev_tree = make_treeview(table_card, cols)
         tv_frame.pack(fill="both", expand=True)
+        self._ev_tree.configure(height=12)
         self._ev_tree.column("ID", width=50, anchor="center")
+        self._ev_tree.column("Name", width=280, anchor="w")
+        self._ev_tree.column("Date", width=120, anchor="center")
+        self._ev_tree.column("Club", width=180, anchor="w")
 
         self._load_events()
 
         # action buttons
-        btn_row = tk.Frame(wrap, bg=BG)
+        btn_row = tk.Frame(table_card, bg=SURFACE)
         btn_row.pack(fill="x", pady=(12, 0))
 
         make_button(btn_row, "✏️  Edit Selected",   self._edit_event,
-                    color=ACCENT,  width=16).pack(side="left", padx=(0, 8))
+                    color=ACCENT,  width=16).pack(side="right", padx=(8, 0))
         make_button(btn_row, "🗑  Delete Selected", self._delete_event,
-                    color=ACCENT2, width=16).pack(side="left")
+                    color=ACCENT2, width=16).pack(side="right")
 
     def _load_events(self):
         self._ev_tree.delete(*self._ev_tree.get_children())
@@ -602,12 +693,30 @@ class AdminDashboard(tk.Frame):
     # Section: View Registrations
     # ══════════════════════════════════════════════════════════════════════
     def _build_view_registrations(self):
-        wrap = tk.Frame(self._content, bg=BG, padx=40, pady=30)
+        wrap = tk.Frame(self._content, bg=BG, padx=24, pady=20)
         wrap.pack(fill="both", expand=True)
 
         make_label(wrap, "All Registrations", font=FONT_TITLE).pack(anchor="w")
         make_label(wrap, "Every student–event pair in the system.",
-                   fg=MUTED).pack(anchor="w", pady=(4, 16))
+                   fg=MUTED).pack(anchor="w", pady=(2, 12))
+
+        rows = reg_svc.get_all_registrations()
+        event_count = len({r.get("event_name", "") for r in rows if r.get("event_name")})
+        club_count = len({r.get("club", "") for r in rows if r.get("club")})
+
+        summary = tk.Frame(wrap, bg=BG)
+        summary.pack(fill="x", pady=(0, 10))
+
+        def reg_stat(parent, title, value, accent):
+            card = tk.Frame(parent, bg=SURFACE, padx=14, pady=12,
+                            highlightthickness=1, highlightbackground=BORDER)
+            card.pack(side="left", fill="x", expand=True, padx=(0, 8))
+            tk.Label(card, text=title, bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(anchor="w")
+            tk.Label(card, text=str(value), bg=SURFACE, fg=accent, font=("Segoe UI", 16, "bold")).pack(anchor="w", pady=(4, 0))
+
+        reg_stat(summary, "Total Registrations", len(rows), ACCENT3)
+        reg_stat(summary, "Events Covered", event_count, ACCENT)
+        reg_stat(summary, "Clubs Active", club_count, ACCENT2)
 
         action_row = tk.Frame(wrap, bg=BG)
         action_row.pack(fill="x", pady=(0, 8))
@@ -619,11 +728,23 @@ class AdminDashboard(tk.Frame):
         make_button(action_row, "🔄  Refresh", self._refresh_regs,
                     color=SURFACE2, width=12).pack(side="right")
 
+        table_card = tk.Frame(wrap, bg=SURFACE, padx=12, pady=12,
+                              highlightthickness=1, highlightbackground=BORDER)
+        table_card.pack(fill="both", expand=True)
+        make_label(table_card, "Registration List", font=FONT_HEAD, bg=SURFACE).pack(anchor="w")
+        make_label(table_card, "Student and event combinations currently registered.", fg=MUTED, bg=SURFACE).pack(anchor="w", pady=(2, 8))
+
         cols = ("Student", "Email", "Event", "Date", "Club")
-        tv_frame, self._reg_tree = make_treeview(wrap, cols)
+        tv_frame, self._reg_tree = make_treeview(table_card, cols)
         tv_frame.pack(fill="both", expand=True)
+        self._reg_tree.configure(height=12)
         for col in cols:
             self._reg_tree.column(col, width=110)
+        self._reg_tree.column("Student", width=180, anchor="w")
+        self._reg_tree.column("Email", width=220, anchor="w")
+        self._reg_tree.column("Event", width=220, anchor="w")
+        self._reg_tree.column("Date", width=120, anchor="center")
+        self._reg_tree.column("Club", width=160, anchor="w")
 
         self._load_registrations()
 
@@ -670,12 +791,27 @@ class AdminDashboard(tk.Frame):
     # Section: Announcements
     # ══════════════════════════════════════════════════════════════════════
     def _build_announcements(self):
-        wrap = tk.Frame(self._content, bg=BG, padx=40, pady=30)
+        wrap = tk.Frame(self._content, bg=BG, padx=24, pady=20)
         wrap.pack(fill="both", expand=True)
 
         make_label(wrap, "Announcements", font=FONT_TITLE).pack(anchor="w")
         make_label(wrap, "Send updates and reminders to students without changing the design.",
-                   fg=MUTED).pack(anchor="w", pady=(4, 16))
+                   fg=MUTED).pack(anchor="w", pady=(2, 12))
+
+        info_row = tk.Frame(wrap, bg=BG)
+        info_row.pack(fill="x", pady=(0, 10))
+
+        info1 = tk.Frame(info_row, bg=SURFACE, padx=14, pady=12,
+                         highlightthickness=1, highlightbackground=BORDER)
+        info1.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        make_label(info1, "Channel", bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(anchor="w")
+        make_label(info1, "Student Notifications", bg=SURFACE, fg=ACCENT3, font=FONT_HEAD).pack(anchor="w", pady=(4, 0))
+
+        info2 = tk.Frame(info_row, bg=SURFACE, padx=14, pady=12,
+                         highlightthickness=1, highlightbackground=BORDER)
+        info2.pack(side="left", fill="x", expand=True)
+        make_label(info2, "Tip", bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(anchor="w")
+        make_label(info2, "Keep messages short and actionable", bg=SURFACE, fg=ACCENT, font=FONT_HEAD).pack(anchor="w", pady=(4, 0))
 
         announce_card = tk.Frame(wrap, bg=SURFACE, padx=18, pady=18,
                                  highlightthickness=1, highlightbackground=BORDER)
@@ -695,8 +831,12 @@ class AdminDashboard(tk.Frame):
             wrap="word",
         )
         self._announcement_text.pack(fill="x")
-        make_button(announce_card, "📣 Send Announcement", self._send_announcement,
-                    color=ACCENT, width=18).pack(anchor="w", pady=(10, 0))
+        btn_row = tk.Frame(announce_card, bg=SURFACE)
+        btn_row.pack(fill="x", pady=(10, 0))
+        make_button(btn_row, "📣 Send Announcement", self._send_announcement,
+                    color=ACCENT, width=18).pack(side="left")
+        make_button(btn_row, "🧹 Clear", lambda: self._announcement_text.delete("1.0", "end"),
+                    color=SURFACE2, width=10).pack(side="left", padx=(8, 0))
 
         reminder_card = tk.Frame(wrap, bg=SURFACE, padx=18, pady=18,
                                  highlightthickness=1, highlightbackground=BORDER)
@@ -714,9 +854,16 @@ class AdminDashboard(tk.Frame):
         )
         self._reminder_combo.pack(fill="x", pady=(0, 8))
 
+        btn_row = tk.Frame(reminder_card, bg=SURFACE)
+        btn_row.pack(fill="x", pady=(0, 8))
+        make_button(btn_row, "🔄 Refresh Events", self._load_reminder_events,
+                    color=SURFACE2, width=16).pack(side="left")
+        make_button(btn_row, "⏰ Send Reminder", self._send_event_reminder,
+                    color=ACCENT3, width=16).pack(side="left", padx=(8, 0))
+
         self._reminder_note = tk.Text(
             reminder_card,
-            height=4,
+            height=3,
             bg=SURFACE2,
             fg=TEXT,
             insertbackground=TEXT,
@@ -725,13 +872,6 @@ class AdminDashboard(tk.Frame):
             wrap="word",
         )
         self._reminder_note.pack(fill="x")
-
-        btn_row = tk.Frame(reminder_card, bg=SURFACE)
-        btn_row.pack(fill="x", pady=(10, 0))
-        make_button(btn_row, "🔄 Refresh Events", self._load_reminder_events,
-                    color=SURFACE2, width=16).pack(side="left")
-        make_button(btn_row, "⏰ Send Reminder", self._send_event_reminder,
-                    color=ACCENT3, width=16).pack(side="left", padx=(8, 0))
 
         self._load_reminder_events()
 
@@ -773,12 +913,34 @@ class AdminDashboard(tk.Frame):
     # Section: Reports
     # ══════════════════════════════════════════════════════════════════════
     def _build_reports(self):
-        wrap = tk.Frame(self._content, bg=BG, padx=40, pady=30)
+        wrap = tk.Frame(self._content, bg=BG, padx=24, pady=20)
         wrap.pack(fill="both", expand=True)
 
         make_label(wrap, "Reports", font=FONT_TITLE).pack(anchor="w")
         make_label(wrap, "Review event participation and attendance performance.",
-                   fg=MUTED).pack(anchor="w", pady=(4, 16))
+                   fg=MUTED).pack(anchor="w", pady=(2, 12))
+
+        report_rows = reg_svc.get_registration_summary()
+        report_events = len(report_rows)
+        report_regs = sum((row.get("total_registered", 0) or 0) for row in report_rows)
+        report_avg = 0.0
+        att_rows = att_svc.get_attendance_summary()
+        if att_rows:
+            report_avg = round(sum((row.get("attendance_rate", 0.0) or 0.0) for row in att_rows) / len(att_rows), 1)
+
+        summary = tk.Frame(wrap, bg=BG)
+        summary.pack(fill="x", pady=(0, 10))
+
+        def rep_stat(parent, title, value, accent):
+            card = tk.Frame(parent, bg=SURFACE, padx=14, pady=12,
+                            highlightthickness=1, highlightbackground=BORDER)
+            card.pack(side="left", fill="x", expand=True, padx=(0, 8))
+            tk.Label(card, text=title, bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(anchor="w")
+            tk.Label(card, text=str(value), bg=SURFACE, fg=accent, font=("Segoe UI", 16, "bold")).pack(anchor="w", pady=(4, 0))
+
+        rep_stat(summary, "Events", report_events, ACCENT)
+        rep_stat(summary, "Registrations", report_regs, ACCENT3)
+        rep_stat(summary, "Avg Attendance", f"{report_avg}%", ACCENT2)
 
         action_row = tk.Frame(wrap, bg=BG)
         action_row.pack(fill="x", pady=(0, 8))
@@ -790,9 +952,16 @@ class AdminDashboard(tk.Frame):
         make_button(action_row, "🔄 Refresh", self._load_reports,
                     color=SURFACE2, width=12).pack(side="right", padx=(0, 8))
 
+        table_card = tk.Frame(wrap, bg=SURFACE, padx=12, pady=12,
+                              highlightthickness=1, highlightbackground=BORDER)
+        table_card.pack(fill="both", expand=True)
+        make_label(table_card, "Performance Table", font=FONT_HEAD, bg=SURFACE).pack(anchor="w")
+        make_label(table_card, "Registration and attendance metrics by event.", fg=MUTED, bg=SURFACE).pack(anchor="w", pady=(2, 8))
+
         cols = ("Event", "Date", "Club", "Registered", "Present", "Absent", "Attendance %")
-        tv_frame, self._report_tree = make_treeview(wrap, cols)
+        tv_frame, self._report_tree = make_treeview(table_card, cols)
         tv_frame.pack(fill="both", expand=True)
+        self._report_tree.configure(height=12)
         self._report_tree.column("Event", width=200, anchor="w")
         self._report_tree.column("Club", width=130, anchor="w")
         for col in ("Registered", "Present", "Absent", "Attendance %"):
@@ -876,11 +1045,11 @@ class AdminDashboard(tk.Frame):
     # Section: Attendance
     # ══════════════════════════════════════════════════════════════════════
     def _build_attendance(self):
-        wrap = tk.Frame(self._content, bg=BG, padx=24, pady=24)
+        wrap = tk.Frame(self._content, bg=BG, padx=24, pady=20)
         wrap.pack(fill="both", expand=True)
 
         make_label(wrap, "Attendance", font=FONT_TITLE).pack(anchor="w")
-        make_label(wrap, "Track event attendance and participation", fg=MUTED).pack(anchor="w", pady=(4, 16))
+        make_label(wrap, "Track event attendance and participation", fg=MUTED).pack(anchor="w", pady=(2, 12))
 
         # top KPI cards
         card_frame = tk.Frame(wrap, bg=BG)
@@ -893,7 +1062,8 @@ class AdminDashboard(tk.Frame):
         rate = round((total_present / total_records) * 100, 1) if total_records else 0.0
 
         def stat_card(parent, title, value, note):
-            c = tk.Frame(parent, bg=SURFACE, bd=0, relief="flat", padx=16, pady=12)
+            c = tk.Frame(parent, bg=SURFACE, bd=0, relief="flat", padx=16, pady=12,
+                         highlightthickness=1, highlightbackground=BORDER)
             c.pack(side="left", expand=True, fill="x", padx=6)
             tk.Label(c, text=title, bg=SURFACE, fg=MUTED, font=("Helvetica", 9)).pack(anchor="w")
             tk.Label(c, text=str(value), bg=SURFACE, fg=ACCENT3, font=("Helvetica", 28, "bold")).pack(anchor="w")
@@ -911,21 +1081,22 @@ class AdminDashboard(tk.Frame):
         make_button(action_row, "Export", self._export_attendance, color=ACCENT, width=10).pack(side="left", padx=(8, 0))
 
         # manual attendance area (no QR required)
-        manual_frame = tk.Frame(wrap, bg=BG, pady=8)
+        manual_frame = tk.Frame(wrap, bg=SURFACE, padx=14, pady=12,
+                                highlightthickness=1, highlightbackground=BORDER)
         manual_frame.pack(fill="x", pady=(0, 12))
-        make_label(manual_frame, "Manual Attendance (no QR required)", font=FONT_SMALL, fg=ACCENT).pack(anchor="w")
+        make_label(manual_frame, "Manual Attendance (no QR required)", font=FONT_SMALL, fg=ACCENT, bg=SURFACE).pack(anchor="w")
 
-        mname_frame = tk.Frame(manual_frame, bg=BG)
+        mname_frame = tk.Frame(manual_frame, bg=SURFACE)
         mname_frame.pack(fill="x", pady=(4, 4))
-        tk.Label(mname_frame, text="Username", bg=BG, fg=TEXT).pack(side="left", padx=(0, 6))
+        tk.Label(mname_frame, text="Username", bg=SURFACE, fg=TEXT).pack(side="left", padx=(0, 6))
         self._ma_user = make_entry(mname_frame, width=18)
         self._ma_user.pack(side="left", padx=(0, 20))
 
-        tk.Label(mname_frame, text="Event Name", bg=BG, fg=TEXT).pack(side="left", padx=(0, 6))
+        tk.Label(mname_frame, text="Event Name", bg=SURFACE, fg=TEXT).pack(side="left", padx=(0, 6))
         self._ma_event = make_entry(mname_frame, width=18)
         self._ma_event.pack(side="left", padx=(0, 20))
 
-        tk.Label(mname_frame, text="Status", bg=BG, fg=TEXT).pack(side="left", padx=(0, 6))
+        tk.Label(mname_frame, text="Status", bg=SURFACE, fg=TEXT).pack(side="left", padx=(0, 6))
         self._ma_status = make_entry(mname_frame, width=10)
         self._ma_status.insert(0, "present")
         self._ma_status.pack(side="left", padx=(0, 16))
@@ -933,12 +1104,16 @@ class AdminDashboard(tk.Frame):
         make_button(manual_frame, "Apply Manual Mark", self._apply_manual_attendance, color=ACCENT3, width=16).pack(anchor="w")
 
         # event attendance summary table
-        make_label(wrap, "Event Attendance Records", font=FONT_HEAD).pack(anchor="w")
-        make_label(wrap, "Detailed attendance information for all events", fg=MUTED).pack(anchor="w", pady=(0, 10))
+        summary_card = tk.Frame(wrap, bg=SURFACE, padx=12, pady=12,
+                                highlightthickness=1, highlightbackground=BORDER)
+        summary_card.pack(fill="both", expand=True)
+        make_label(summary_card, "Event Attendance Records", font=FONT_HEAD, bg=SURFACE).pack(anchor="w")
+        make_label(summary_card, "Detailed attendance information for all events", fg=MUTED, bg=SURFACE).pack(anchor="w", pady=(0, 10))
 
         cols = ("Event", "Date", "Club", "Registered", "Present", "Absent", "Attendance %")
-        tv_frame, self._summary_tree = make_treeview(wrap, cols)
+        tv_frame, self._summary_tree = make_treeview(summary_card, cols)
         tv_frame.pack(fill="both", expand=True)
+        self._summary_tree.configure(height=7)
         for c in ("Registered", "Present", "Absent", "Attendance %"):
             self._summary_tree.column(c, width=90, anchor="center")
         self._summary_tree.column("Club", width=140, anchor="w")
@@ -946,11 +1121,12 @@ class AdminDashboard(tk.Frame):
         self._load_attendance_summary()
 
         # detail attendance table for marking
-        detail_wrap = tk.Frame(wrap, bg=BG, pady=12)
+        detail_wrap = tk.Frame(wrap, bg=SURFACE, pady=12, padx=12,
+                       highlightthickness=1, highlightbackground=BORDER)
         detail_wrap.pack(fill="both", expand=True)
 
-        make_label(detail_wrap, "Student Attendance", font=FONT_HEAD).pack(anchor="w")
-        make_label(detail_wrap, "Select a participant below and mark attendance.", fg=MUTED).pack(anchor="w", pady=(0, 10))
+        make_label(detail_wrap, "Student Attendance", font=FONT_HEAD, bg=SURFACE).pack(anchor="w")
+        make_label(detail_wrap, "Select a participant below and mark attendance.", fg=MUTED, bg=SURFACE).pack(anchor="w", pady=(0, 10))
 
         detail_cols = ("Student", "Email", "Event", "Date", "Club", "Status", "user_id", "event_id")
         detail_frame, self._att_tree = make_treeview(detail_wrap, detail_cols)
@@ -960,7 +1136,7 @@ class AdminDashboard(tk.Frame):
 
         self._load_detail_attendance()
 
-        btn_row = tk.Frame(detail_wrap, bg=BG)
+        btn_row = tk.Frame(detail_wrap, bg=SURFACE)
         btn_row.pack(fill="x", pady=(8, 0))
 
         make_button(btn_row, "✅ Mark Present", self._mark_selected_present, color=ACCENT, width=16).pack(side="left", padx=(0, 8))
@@ -1200,10 +1376,10 @@ class AdminDashboard(tk.Frame):
         wrap.pack(fill="both", expand=True)
 
         make_label(wrap, "Event Calendar", font=FONT_TITLE).pack(anchor="center")
-        make_label(wrap, "Overview of events and day-by-day schedule", fg=MUTED).pack(anchor="center", pady=(4, 16))
+        make_label(wrap, "Overview of events and day-by-day schedule", fg=MUTED).pack(anchor="center", pady=(2, 10))
 
         controls = tk.Frame(wrap, bg=BG)
-        controls.pack(pady=(0, 12))
+        controls.pack(pady=(0, 8))
 
         make_button(controls, "◀", lambda: self._change_month(-1), width=4).pack(side="left")
         self._calendar_label = tk.Label(controls, text="", bg=BG, fg=ACCENT, font=FONT_BODY)
@@ -1212,8 +1388,8 @@ class AdminDashboard(tk.Frame):
 
         make_button(controls, "🔄 Refresh", self._refresh_event_calendar, color=SURFACE2, width=10).pack(side="left")
 
-        cal_frame = tk.Frame(wrap, bg=SURFACE, padx=14, pady=14, highlightthickness=1, highlightbackground=BORDER)
-        cal_frame.pack(anchor="center", pady=(0, 18))
+        cal_frame = tk.Frame(wrap, bg=SURFACE, padx=10, pady=10, highlightthickness=1, highlightbackground=BORDER)
+        cal_frame.pack(anchor="center", pady=(0, 10))
 
         self._day_buttons = []
         headers = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -1224,7 +1400,7 @@ class AdminDashboard(tk.Frame):
                 bg=SURFACE,
                 fg=MUTED,
                 font=FONT_SMALL,
-                width=5,
+                width=4,
             ).grid(row=0, column=idx, padx=3, pady=(0, 6))
 
         for week_idx in range(6):
@@ -1233,8 +1409,8 @@ class AdminDashboard(tk.Frame):
                 btn = tk.Button(
                     cal_frame,
                     text="",
-                    width=5,
-                    height=2,
+                    width=4,
+                    height=1,
                     bg=SURFACE2,
                     fg=TEXT,
                     relief="flat",
@@ -1256,7 +1432,8 @@ class AdminDashboard(tk.Frame):
 
         selected_cols = ("Event", "Club", "Present", "Absent", "Total")
         tv_frame, self._cal_tree = make_treeview(details, selected_cols)
-        tv_frame.pack(fill="both", expand=True)
+        tv_frame.pack(fill="both", expand=False)
+        self._cal_tree.configure(height=5)
         for c in ("Present", "Absent", "Total"):
             self._cal_tree.column(c, width=80, anchor="center")
 
@@ -1264,6 +1441,7 @@ class AdminDashboard(tk.Frame):
         month_cols = ("Date", "Event", "Club", "Present", "Absent", "Total")
         month_frame, self._month_events_tree = make_treeview(details, month_cols)
         month_frame.pack(fill="both", expand=True, pady=(8, 0))
+        self._month_events_tree.configure(height=9)
         for c in ("Present", "Absent", "Total"):
             self._month_events_tree.column(c, width=80, anchor="center")
 
