@@ -17,6 +17,18 @@ def get_all_events():
         conn.close()
 
 
+def get_event_by_id(event_id: int):
+    """Return a single event by ID."""
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM events WHERE id = ?", (event_id,))
+        row = cur.fetchone()
+        return Event(row["id"], row["name"], row["date"], row["club"]) if row else None
+    finally:
+        conn.close()
+
+
 def get_total_events():
     conn = get_connection()
     try:
