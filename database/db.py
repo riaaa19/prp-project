@@ -11,6 +11,7 @@ def get_connection():
     """Return a connection to the SQLite database."""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row  # allows dict-like access to rows
+    conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
 
@@ -37,6 +38,17 @@ def initialize_db():
             name        TEXT    NOT NULL UNIQUE,
             description TEXT,
             created_at  TEXT    NOT NULL
+        )
+    """)
+
+    # ── Events ───────────────────────────────────────────────────────────
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS events (
+            id       INTEGER PRIMARY KEY AUTOINCREMENT,
+            name     TEXT    NOT NULL,
+            date     TEXT    NOT NULL,
+            club     TEXT    NOT NULL,
+            club_id  INTEGER REFERENCES clubs(id) ON DELETE SET NULL
         )
     """)
 
