@@ -614,6 +614,18 @@ class AdminDashboard(tk.Frame):
         make_button(action_row, "🔄  Refresh", self._refresh_events,
                     color=SURFACE2, width=12).pack(side="right")
 
+        filter_card = tk.Frame(wrap, bg=SURFACE, padx=12, pady=10,
+                               highlightthickness=1, highlightbackground=BORDER)
+        filter_card.pack(fill="x", pady=(0, 8))
+
+        filter_row = tk.Frame(filter_card, bg=SURFACE)
+        filter_row.pack(fill="x")
+
+        tk.Label(filter_row, text="Search", bg=SURFACE, fg=MUTED, font=FONT_SMALL).pack(side="left")
+        self._ev_search_entry = make_entry(filter_row, width=24)
+        self._ev_search_entry.pack(side="left", padx=(8, 14))
+        self._ev_search_entry.bind("<KeyRelease>", self._apply_event_filters)
+
         table_card = tk.Frame(wrap, bg=SURFACE, padx=12, pady=12,
                               highlightthickness=1, highlightbackground=BORDER)
         table_card.pack(fill="both", expand=True)
@@ -630,6 +642,7 @@ class AdminDashboard(tk.Frame):
         self._ev_tree.column("Club", width=180, anchor="w")
 
         self._load_events()
+        self._apply_event_filters()
 
         # action buttons
         btn_row = tk.Frame(table_card, bg=SURFACE)
@@ -646,8 +659,31 @@ class AdminDashboard(tk.Frame):
             self._ev_tree.insert("", "end", iid=ev.id,
                                  values=(ev.id, ev.name, ev.date, ev.club))
 
+    def _load_events_with_list(self, events):
+        self._ev_tree.delete(*self._ev_tree.get_children())
+        for ev in events:
+            self._ev_tree.insert("", "end", iid=ev.id,
+                                 values=(ev.id, ev.name, ev.date, ev.club))
+
+    def _get_manage_events_filtered(self):
+        events = event_svc.get_all_events()
+        search_text = self._ev_search_entry.get().strip().lower()
+
+        filtered = []
+        for ev in events:
+            haystack = f"{ev.name} {ev.date} {ev.club}".lower()
+            if search_text and search_text not in haystack:
+                continue
+            filtered.append(ev)
+
+        return filtered
+
+    def _apply_event_filters(self, _event=None):
+        filtered = self._get_manage_events_filtered()
+        self._load_events_with_list(filtered)
+
     def _refresh_events(self):
-        self._load_events()
+        self._apply_event_filters()
         show_toast(self, "Events refreshed.", success=True)
 
     def _get_selected_event(self):
@@ -665,7 +701,7 @@ class AdminDashboard(tk.Frame):
         if messagebox.askyesno("Confirm Delete", f"Delete '{name}'? This will also remove all registrations."):
             event_svc.delete_event(event_id)
             show_toast(self, f"'{name}' deleted.", success=False)
-            self._load_events()
+            self._refresh_events()
 
     def _edit_event(self):
         row = self._get_selected_event()
@@ -704,7 +740,7 @@ class AdminDashboard(tk.Frame):
                 event_svc.update_event(event_id, entries[0].get(),
                                        entries[1].get(), entries[2].get())
                 show_toast(self, "Event updated!", success=True)
-                self._load_events()
+                self._refresh_events()
                 dlg.destroy()
             except ValueError as exc:
                 err_var.set(str(exc))
